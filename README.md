@@ -7,7 +7,7 @@ In order for it to function, you must create the folder "extra/fonts" and place 
 An example font (the font used in the webclient) has been provided in the writefont folder. See /help writefont for in-game usage.
 
 ## cefcontainment.cs
-This plugins makes it so that only players who have permission to build in the map may use [cef](https://github.com/SpiralP/classicube-cef-loader-plugin) commands.
+This plugin makes it so that only players who have permission to build in the map may use [cef](https://github.com/SpiralP/classicube-cef-loader-plugin) commands.
 
 ## grc.cs
 This plugin adds /GotoRandomCool, which is like /gotorandom, but based on a curated list. The list can be managed with the /grc command.
