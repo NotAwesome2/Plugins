@@ -19,3 +19,8 @@ This plugin makes ordering the block menu much easier. See /help orderblocks for
 This plugin is complimentary to [Not-Awesome-Script](https://github.com/NotAwesome2/Not-Awesome-Script). It allows you to create clientside instances of bots to manipulate with scripted movements. See /help tempbot for more details.
 
 This plugin also comes with bonus /flipcoin and /movebots commands. See their /help for more info.
+
+## ipnick.cs
+This plugin introduces an "IP nickname" to players, which allows anyone to identify accounts by IP without seeing the actual IP address.
+
+It is displayed in /whois and when the player logs in.
