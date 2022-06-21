@@ -24,3 +24,6 @@ This plugin also comes with bonus /flipcoin and /movebots commands. See their /h
 This plugin introduces an "IP nickname" to players, which allows anyone to identify accounts by IP without seeing the actual IP address.
 
 It is displayed in /whois and when the player logs in.
+
+## nasgen.cs
+This plugin adds [Not-Awesome-Survival](https://github.com/NotAwesome2/Nas) style gen as a /newlvl gen option.
