@@ -1,11 +1,10 @@
-//reference System.Drawing.dll
 using System;
-using System.Drawing;
 using System.IO;
 using MCGalaxy.Drawing;
 using MCGalaxy.Drawing.Brushes;
 using MCGalaxy.Drawing.Ops;
 using MCGalaxy.Maths;
+using MCGalaxy.Util;
 using BlockID = System.UInt16;
 using MCGalaxy.Commands;
 
@@ -14,7 +13,7 @@ namespace MCGalaxy.Commands.Building {
 		public override string name { get { return "WriteFontPlugin"; } }
 		public override string creator { get { return ""; } }
 		public override string welcome { get { return ""; } }
-		public override string MCGalaxy_Version { get { return "1.9.0.7"; } }
+		public override string MCGalaxy_Version { get { return "1.9.4.2"; } }
 		
 		public override void Load(bool startup) {
 			Command.Register(new CmdWriteFont());
@@ -34,17 +33,6 @@ namespace MCGalaxy.Commands.Building {
 		protected override string SelectionType { get { return "direction"; } }
 		protected override string PlaceMessage { get { return "Place or break two blocks to determine direction."; } }
 		
-		// TODO: Absolutely filthy copy paste! Fix in MCGalaxy
-		BrushFactory MakeBrush(DrawArgs args) {
-			args.BrushName = args.Player.BrushName;
-			args.BrushArgs = "";
-			GetBrush(args);
-			
-			if (args.BrushArgs.Length == 0) args.BrushArgs = args.Player.DefaultBrushArgs;
-			return BrushFactory.Find(args.BrushName);
-		}
-		// END filthy copy paste
-		
 		public override void Use(Player p, string message, CommandData data) {
 			string[] args = message.SplitSpaces(2);
 			if (args.Length < 2) { Help(p); return; }
@@ -61,11 +49,13 @@ namespace MCGalaxy.Commands.Building {
 			
 			if (!Formatter.ValidName(p, font, "file")) return;
 			string path = "extra/fonts/" + font + ".png";
-			if (!File.Exists(path)) { p.Message("%WFont {0} doesn't exist", path); return; }
+			if (!File.Exists(path)) { p.Message("&WFont {0} doesn't exist", path); return; }
 			
 			FontWriteDrawOp op = new FontWriteDrawOp();
 			op.Scale = scale; op.Spacing = spacing;
 			op.Path  = path;  op.Text    = args[1];
+            op.Text = Chat.Format(op.Text, p);
+            op.Text = ProfanityFilter.Parse(op.Text);
 			
 			// TODO: filthy copy paste
 			DrawArgs dArgs = new DrawArgs();
@@ -94,10 +84,10 @@ namespace MCGalaxy.Commands.Building {
 		protected override void GetBrush(DrawArgs dArgs) { dArgs.BrushArgs = ""; }
 
 		public override void Help(Player p) {
-			p.Message("%T/WriteFont [font] [message]");
-			p.Message("%HWrites [message] in blocks. Supports color codes.");
+			p.Message("&T/WriteFont [font] [message]");
+			p.Message("&HWrites [message] in blocks. Supports color codes.");
 			MessageFonts(p);
-			p.Message("%HUse %T/WriteChat %Hfor default font shortcut.");
+			p.Message("&HUse &T/WriteChat &Hfor default font shortcut.");
 		}
 		static void MessageFonts(Player p) {
 			p.Message("&HAvailable fonts: &b{0}", String.Join("&H, &b", GetFonts()));
@@ -123,9 +113,9 @@ namespace MCGalaxy.Commands.Building {
 		}
 
 		public override void Help(Player p) {
-			p.Message("%T/WriteChat [message]");
-			p.Message("%HWrites [message] with NA2 chat font. Supports color codes.");
-			p.Message("%HSee %T/WriteFont %Hfor other fonts.");
+			p.Message("&T/WriteChat [message]");
+			p.Message("&HWrites [message] with NA2 chat font. Supports color codes.");
+			p.Message("&HSee &T/WriteFont &Hfor other fonts.");
 		}
 	}
 	
@@ -143,7 +133,7 @@ namespace MCGalaxy.Commands.Building {
 		}
 		
 		Vec3S32 dir, pos;
-		public override void Perform(Vec3S32[] marks, MCGalaxy.Drawing.Brushes.Brush brush, DrawOpOutput output) {
+		public override void Perform(Vec3S32[] marks, Brush brush, DrawOpOutput output) {
 			Vec3S32 p1 = marks[0], p2 = marks[1];
 			if (Math.Abs(p2.X - p1.X) > Math.Abs(p2.Z - p1.Z)) {
 				dir.X = p2.X > p1.X ? 1 : -1;
@@ -153,33 +143,34 @@ namespace MCGalaxy.Commands.Building {
 			
 			pos = p1;
 			selector.SetPalette(palette.Entries, palette.Entries);
-			
-			using (Bitmap img = new Bitmap(Path))
-				using (PixelGetter src = new PixelGetter(img))
+			byte[] data = File.ReadAllBytes(Path);
+
+			using (IBitmap2D img = IBitmap2D.Create())
 			{
+				img.Decode(data);
 				if (img.Width != 128 || img.Height != 128)
 					throw new InvalidOperationException("Font must be 128x128 image");
-				
-				src.Init();
+
+				img.LockBits();
 				ColorDesc tint = Colors.List['f'];
 				
 				for (int i = 0; i < Text.Length; i++) {
 					char c = Text[i].UnicodeToCp437();
 					
 					// tint text by colour code
-					if (c == '%' && i < Text.Length - 1) {
+					if (c == '&' && i < Text.Length - 1) {
 						char n = Text[i+1].UnicodeToCp437();
 						if (!Colors.List[n].Undefined) {
 		 					tint = Colors.List[n]; i++; 
 							continue;
 						}
 					}
-					DrawLetter(Player, c, src, tint, output); 
+					DrawLetter(Player, c, img, tint, output); 
 				}
 			}
 		}
 		
-		static int GetTileWidth(PixelGetter src, int x, int y) {
+		static int GetTileWidth(IBitmap2D src, int x, int y) {
 			for (int xx = 7; xx >= 0; xx--) {
 				// Is there a pixel in this column
 				for (int yy = 0; yy < 8; yy++) {
@@ -189,7 +180,7 @@ namespace MCGalaxy.Commands.Building {
 			return 0;
 		}
 		
-		void DrawLetter(Player p, char c, PixelGetter src, ColorDesc tint, DrawOpOutput output) {
+		void DrawLetter(Player p, char c, IBitmap2D src, ColorDesc tint, DrawOpOutput output) {
 			int Y = (int)(c >> 4)   * 8;
 			int X = (int)(c & 0x0F) * 8;
 			int width = GetTileWidth(src, X, Y);
@@ -214,7 +205,7 @@ namespace MCGalaxy.Commands.Building {
 							P.R = (byte)(P.R * tint.R / 255); 
 							P.G = (byte)(P.G * tint.G / 255);
 							P.B = (byte)(P.B * tint.B / 255);
-							b = selector.BestMatch(P.R, P.G, P.B);
+							b = selector.BestMatch(ref P);
 						}
 						
 						for (int ver = 0; ver < Scale; ver++)
