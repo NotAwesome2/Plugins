@@ -11,21 +11,21 @@ using MCGalaxy.Generator;
 using MCGalaxy.Generator.Foliage;
 
 namespace MCGalaxy {
-	
-	public sealed class PluginNasGen : Plugin {
-		public override string name { get { return "PluginNasGen"; } }
-		public override string MCGalaxy_Version { get { return "1.9.2.0"; } }
-		public override string creator { get { return "Goodly"; } }
+    
+    public sealed class PluginNasGen : Plugin {
+        public override string name { get { return "PluginNasGen"; } }
+        public override string MCGalaxy_Version { get { return "1.9.2.0"; } }
+        public override string creator { get { return "Goodly"; } }
 
 
-		public override void Load(bool startup) {
-			MapGen.Register("nasGen", GenType.Advanced, NasGen.Gen, "hello?");
-		}
-		public override void Unload(bool shutdown) {
-			
-		}
-	}
-	
+        public override void Load(bool startup) {
+            MapGen.Register("nasGen", GenType.Advanced, NasGen.Gen, "hello?");
+        }
+        public override void Unload(bool shutdown) {
+            
+        }
+    }
+    
     public static class NasGen {
         public const int mapWideness = 384;
         public const int mapTallness = 256;
@@ -55,11 +55,27 @@ namespace MCGalaxy {
             return true;
         }
         
+        static int MakeInt(string seed) {
+            if (seed.Length == 0) return new Random().Next();
+            
+            int value;
+            if (!int.TryParse(seed, out value)) value = seed.GetHashCode();
+            return value;
+        }
+        
         public static bool currentlyGenerating = false;
-        public static bool Gen(Player p, Level lvl, string seed) {
+        public static bool Gen(Player p, Level lvl, MapGenArgs args) {
+            if (lvl.Height < mapTallness) {
+                p.Message("&cNasgen only works with world height &b{0}&c or greater.", mapTallness);
+                p.Message("Try something like &b128 {0} 128 nasgen &Sfor generation arguments.", mapTallness);
+                return false;
+            }
+            
             currentlyGenerating = true;
             int offsetX = 0, offsetZ = 0;
             int chunkOffsetX = 0, chunkOffsetZ = 0;
+            
+            string seed = args.Args;
             GetSeedAndChunkOffset(lvl.name, ref seed, ref chunkOffsetX, ref chunkOffsetZ);
             
             offsetX = chunkOffsetX * mapWideness;
@@ -69,7 +85,7 @@ namespace MCGalaxy {
             p.Message("offsetX offsetZ {0} {1}", offsetX, offsetZ);
 
             Perlin adjNoise = new Perlin();
-            adjNoise.Seed = MapGen.MakeInt(seed);
+            adjNoise.Seed = MakeInt(seed);
             Random r = new Random(adjNoise.Seed);
             DateTime dateStart = DateTime.UtcNow;
 
@@ -100,7 +116,7 @@ namespace MCGalaxy {
             public Player p;
             public Level lvl;
             //public NasLevel nl;
-			public ushort[,] heightmap;
+            public ushort[,] heightmap;
             public Perlin adjNoise;
             public float[,] temps;
             public int offsetX, offsetZ;
@@ -248,12 +264,12 @@ namespace MCGalaxy {
                             }
                         }
                     }
-					//nl
+                    //nl
             }
             void GenSoil() {
                 int width = lvl.Width, height = lvl.Height, length = lvl.Length;
                 p.Message("Now creating soil.");
-                adjNoise.Seed = MapGen.MakeInt(seed + "soil");
+                adjNoise.Seed = MakeInt(seed + "soil");
                 adjNoise.Frequency = 1;
                 adjNoise.OctaveCount = 6;
 
@@ -312,7 +328,7 @@ namespace MCGalaxy {
                 int width = lvl.Width, height = lvl.Height, length = lvl.Length;
 
                 p.Message("Now creating caves");
-                adjNoise.Seed = MapGen.MakeInt(seed + "cave");
+                adjNoise.Seed = MakeInt(seed + "cave");
                 adjNoise.Frequency = 1; //more frequency = smaller map scale
                 adjNoise.OctaveCount = 2;
 
@@ -366,7 +382,7 @@ namespace MCGalaxy {
             }
             void GenPlants() {
                 p.Message("Now creating grass and trees.");
-                adjNoise.Seed = MapGen.MakeInt(seed + "tree");
+                adjNoise.Seed = MakeInt(seed + "tree");
                 adjNoise.Frequency = 1;
                 adjNoise.OctaveCount = 1;
 
@@ -403,7 +419,7 @@ namespace MCGalaxy {
             void GenTree(ushort x, ushort y, ushort z) {
                 topSoil = Block.Dirt;
                 NasTree.GenOakTree(lvl, r, x, y, z);
-				//nl
+                //nl
             }
 
             
@@ -458,7 +474,7 @@ namespace MCGalaxy {
         }
         
     }
-	
+    
     public static class NasTree {
         public static void Setup() {
             
@@ -482,5 +498,5 @@ namespace MCGalaxy {
             });
         }
     }
-	
+    
 }
