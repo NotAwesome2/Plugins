@@ -17,6 +17,11 @@ using MCGalaxy.Maths;
 using MCGalaxy.Tasks;
 using MCGalaxy.DB;
 
+using Vec3I = MCGalaxy.Maths.Vec3S32;
+using KeyFrameList = System.Collections.Generic.List<MCGalaxy.KeyFrame>;
+
+using static MCGalaxy.PluginTempBot;
+
 //unknownshadow200: well player ids go from 0 up to 255. normal bots go from 127 down to 64, then 254 down to 127, then finally 63 down to 0.
 
 namespace MCGalaxy {
@@ -27,29 +32,11 @@ namespace MCGalaxy {
         public override string type { get { return CommandTypes.Other; } }
         public override bool museumUsable { get { return false; } }
         public override LevelPermission defaultRank { get { return LevelPermission.Operator; } }
-
+        
         public override void Use(Player p, string message, CommandData data) {		
-            if (message.CaselessEq("where")) {
-                //-16 so it's centered on the block instead of min corner
-                Vec3F32 pos = new Vec3F32(p.Pos.X-16, p.Pos.Y - Entities.CharacterHeight, p.Pos.Z-16);
-                pos.X /= 32;
-                pos.Y /= 32;
-                pos.Z /= 32;
-    			
-    			p.Send(Packet.Message(
-    			    pos.X + " " + pos.Y + " " + pos.Z+" "+Orientation.PackedToDegrees(p.Rot.RotY)+" "+Orientation.PackedToDegrees(p.Rot.HeadX),
-    			                      CpeMessageType.Normal, p.hasCP437));
-    			return;
-            }
+            if (message.CaselessEq("where")) { DoWhere(p); return; }
+            if (!CanUse(p, data)) { return; }
             
-			if (!(p.group.Permission >= LevelPermission.Operator)) {
-				if (!Hacks.CanUseHacks(p)) {
-					if (data.Context != CommandContext.MessageBlock) {
-						p.Message("%cYou cannot use this command manually when hacks are disabled.");
-						return;
-					}
-				}
-			}
             if (message.Length == 0) { Help(p); return; }
             string[] args = message.SplitSpaces(2);
             
@@ -72,6 +59,12 @@ namespace MCGalaxy {
                 return;
             }
             
+            if (args[0].CaselessEq("skin")) {
+                if (args.Length < 2) { p.Message("%cYou need args for botName and skinName."); return; }
+                TrySetSkin(p, args[1]);
+                return;
+            }
+            
             if (args[0].CaselessEq("ai")) {
                 if (args.Length < 2) { p.Message("%cYou need args for botName and AIName."); return; }
                 TrySetAIName(p, args[1]);
@@ -84,9 +77,50 @@ namespace MCGalaxy {
                 return;
             }
             
-            Help(p);
+            if (args[0].CaselessEq("record")) {
+                ToggleRecord(p);
+                return;
+            }
             
+            Help(p);
         }
+        
+        static void ToggleRecord(Player p) {
+            if (!tinfoFor.ContainsKey(p.name)) {
+				tinfoFor[p.name] = new Tinfo(p);
+			}
+            Tinfo tinfo = tinfoFor[p.name];
+            if (!tinfo.recording) {
+                tinfo.StartRecording();
+            } else {
+                tinfo.StopRecording();
+            }
+        }
+        
+        static void DoWhere(Player p) {
+            //-16 so it's centered on the block instead of min corner
+            Vec3F32 pos = new Vec3F32(p.Pos.X-16, p.Pos.Y - Entities.CharacterHeight, p.Pos.Z-16);
+            pos.X /= 32;
+            pos.Y /= 32;
+            pos.Z /= 32;
+            
+            p.Send(Packet.Message(
+                pos.X + " " + pos.Y + " " + pos.Z+" "+Orientation.PackedToDegrees(p.Rot.RotY)+" "+Orientation.PackedToDegrees(p.Rot.HeadX),
+                                  CpeMessageType.Normal, p.hasCP437));
+        }
+        
+        static bool CanUse(Player p, CommandData data) {
+			if (!(p.group.Permission >= LevelPermission.Operator)) {
+				if (!Hacks.CanUseHacks(p)) {
+					if (data.Context != CommandContext.MessageBlock) {
+						p.Message("%cYou cannot use this command manually when hacks are disabled.");
+						return false;
+					}
+				}
+			}
+            return true;
+        }
+        
         void TryAdd(Player p, string message) {
                 string[] args = message.SplitSpaces(8);
                 if (args.Length < 6) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch. Skin and botNick are optional."); return; }
@@ -107,13 +141,12 @@ namespace MCGalaxy {
         }
         
         void Add(Player p, string botName, float x, float y, float z, int yaw, int pitch, string skin, string botNick = "empty") {
-            if (!PluginTempBot.tempBotListAtPlayerName.ContainsKey(p.name)) {
-				PluginTempBot.tempBotListAtPlayerName[p.name] = new TempBotList();
-				p.Extras["TempBot_BotList"] = PluginTempBot.tempBotListAtPlayerName[p.name].botList;
+            if (!tinfoFor.ContainsKey(p.name)) {
+				tinfoFor[p.name] = new Tinfo(p);
 			}
 			
             
-            foreach (PlayerBot b in PluginTempBot.tempBotListAtPlayerName[p.name].botList) {
+            foreach (PlayerBot b in tinfoFor[p.name].botList) {
                 if (botName.CaselessEq(b.name)) {
                     //p.Message("%cThere is already a tempbot with that name.");
                     return;
@@ -125,7 +158,7 @@ namespace MCGalaxy {
                 p.Message("%cReached the limit of tempbots allowed.");
                 return;
             }
-            PluginTempBot.tempBotListAtPlayerName[p.name].usedIDs[ID - PluginTempBot.botIDstartValue] = true;
+            tinfoFor[p.name].usedIDs[ID - PluginTempBot.botIDstartValue] = true;
             
             PlayerBot bot = new PlayerBot(botName, p.level);
             bot.DisplayName = botNick;
@@ -141,7 +174,7 @@ namespace MCGalaxy {
             bot.id = ID;
 
             //p.Message("Picked {0} as ID for {1}", bot.id, bot.name);
-            PluginTempBot.tempBotListAtPlayerName[p.name].botList.Add(bot);
+            tinfoFor[p.name].botList.Add(bot);
             
             Entities.Spawn(p, bot);
         }
@@ -153,13 +186,16 @@ namespace MCGalaxy {
         
         public static void Remove(Player p, string botName) {
             PlayerBot bot = GetBotAtName(p, botName);
+            Remove(p, bot);
+        }
+        public static void Remove(Player p, PlayerBot bot) {
             if (bot != null) {
                 Entities.Despawn(p, bot);
                 //p.Message("Successfully removed {0} with ID of {1}", bot.name, bot.id);
-                //p.Message("ID {0} is now freed from index {1}", bot.id, bot.id - PluginTempBot.botIDstartValue);
+                //p.Message("ID {0} is now freed from index {1}", bot.id, bot.id - botIDstartValue);
                 
-                PluginTempBot.tempBotListAtPlayerName[p.name].usedIDs[bot.id - PluginTempBot.botIDstartValue] = false;
-                PluginTempBot.tempBotListAtPlayerName[p.name].botList.Remove(bot);
+                tinfoFor[p.name].usedIDs[bot.id - botIDstartValue] = false;
+                tinfoFor[p.name].botList.Remove(bot);
             }
         }
         
@@ -171,14 +207,31 @@ namespace MCGalaxy {
             if (bot != null) {
                 SetModel(p, bot, args[1]);
             }
-
         }
+        
         public static void SetModel(Player p, PlayerBot bot, string modelName) {
             bot.Model = modelName;
             if (p.Supports(CpeExt.ChangeModel)) {
 				OnSendingModelEvent.Call(bot, ref modelName, p);
                 p.Send(Packet.ChangeModel(bot.id, modelName, p.hasCP437));
             }
+        }
+        
+        void TrySetSkin(Player p, string message) {
+            string[] args = message.SplitSpaces(2);
+            if (args.Length < 2) { p.Message("%cYou need args for botName and skinName."); return; }
+            
+            PlayerBot bot = GetBotAtName(p, args[0]);
+            if (bot != null) {
+                SetSkin(p, bot, args[1]);
+            }
+        }
+        
+        public static void SetSkin(Player p, PlayerBot bot, string skinName) {
+            bot.SkinName = skinName;
+            
+            //       SendSpawnEntity(byte id, string name, string skin, Position pos, Orientation rot);
+            p.Session.SendSpawnEntity(bot.id, bot.DisplayName, bot.SkinName, bot.Pos, bot.Rot);
         }
         
         void TryTP(Player p, string message) {
@@ -226,8 +279,8 @@ namespace MCGalaxy {
         }
         
         static PlayerBot GetBotAtName(Player p, string botName) {
-            TempBotList list;
-            if (!PluginTempBot.tempBotListAtPlayerName.TryGetValue(p.name, out list) || list.botList.Count == 0)
+            Tinfo list;
+            if (!tinfoFor.TryGetValue(p.name, out list) || list.botList.Count == 0)
             {
                 //p.Message("No tempbots currently exist.");
                 return null;
@@ -241,7 +294,6 @@ namespace MCGalaxy {
             return null;
         }
 		
-        
         public override void Help(Player p) {
             p.Message("%T/TempBot add [botName] [x y z] [yaw pitch] <skin> <botNick>");
             p.Message("%H Places a client-side bot.");
@@ -251,6 +303,8 @@ namespace MCGalaxy {
             p.Message("%H Removes a client-side bot.");
             p.Message("%T/TempBot model [botName] [model name]");
             p.Message("%H Sets model of a client-side bot.");
+            p.Message("%T/TempBot skin [botName] [skin name]");
+            p.Message("%H Sets skin of a client-side bot.");
             p.Message("%T/TempBot ai [botName] [ai arguments]");
             p.Message("%H Sets ai. Use %T/help tempbot ai %Hfor more info.");
             p.Message("%T/TempBot where %H- puts your current X, Y, Z, yaw and pitch into chat for copy pasting.");
@@ -265,6 +319,8 @@ namespace MCGalaxy {
                 p.Message("%H Waits for [time in tenths of a second]");
                 p.Message("%Tmove [X Y Z] <speed>");
                 p.Message("%H <speed> is optional, default is 14.");
+                p.Message("%Tanim [anim data]");
+                p.Message("%H Get anim data from toggling &b/tbot record");
                 p.Message("%Tsummon [X Y Z] [yaw pitch]");
                 p.Message("%H Instantly teleports this tempbot.");
                 p.Message("%Tmodel [modelname]");
@@ -284,9 +340,236 @@ namespace MCGalaxy {
 		
     }
     
-    public class TempBotList {
+    public struct KeyFrame {
+        //RotY = yaw; HeadX = pitch;
+        
+        public static KeyFrame Make(KeyFrameList list, Position pos, Orientation rot) {
+            KeyFrame the = new KeyFrame();
+            
+            
+            the.translation = new Vec3I(pos.X, pos.Y, pos.Z);
+            the.yaw = rot.RotY;
+            the.pitch = rot.HeadX;
+            
+            if (list.Count == 0) {
+                the.useTranslation = true;
+                the.useRotation = true;
+                list.Add(the);
+                return the;
+            }
+            var prev = list[list.Count-1]; //maybe this should be a stack
+            
+            the.relTranslation = the.translation - prev.translation;
+            
+            if (the.yaw == prev.yaw && the.pitch == prev.pitch) { the.useRotation = false; } else { the.useRotation = true; }
+            
+            
+            if (the.relTranslation.X == 0 && the.relTranslation.Y == 0 && the.relTranslation.Z == 0) {
+                //no translation from previous frame
+                list.Add(the);
+                return the;
+            }
+            
+            
+            if (the.relTranslation.X >= sbyte.MinValue && the.relTranslation.X <= sbyte.MaxValue &&
+                the.relTranslation.Y >= sbyte.MinValue && the.relTranslation.Y <= sbyte.MaxValue &&
+                the.relTranslation.Z >= sbyte.MinValue && the.relTranslation.Z <= sbyte.MaxValue) {
+                    
+                the.useRelative = true;
+                list.Add(the);
+                return the;
+            }
+            
+            the.useTranslation = true;
+            list.Add(the);
+            return the;
+        }
+        
+        
+        const byte TRANS_FLAG = (byte)(1 << 0);
+        const byte REL_FLAG   = (byte)(1 << 1);
+        const byte ROT_FLAG   = (byte)(1 << 2);
+        
+        public bool useTranslation;
+        public bool useRelative;
+        public bool useRotation;
+
+        
+        public Vec3I translation;
+        public Vec3I relTranslation;
+        public byte yaw, pitch;
+        
+        public void Print(Player p) {
+            //string base64 = Convert.ToBase64String(ToBytes());
+            //p.Message(base64);
+            if (useTranslation) {
+                p.Message("&xTranslation: {0} {1} {2}", translation.X, translation.Y, translation.Z);
+            }
+            if (useRelative) {
+                p.Message("&xRelative: {0} {1} {2}", relTranslation.X, relTranslation.Y, relTranslation.Z);
+            }
+            if (useRotation) {
+                p.Message("&xYaw pitch: {0} {1}", yaw, pitch);
+            }
+            if (!useTranslation && !useRelative && !useRotation) {
+                p.Message("(no change)");
+            }
+        }
+        public void PrintBytes(Player p) {
+            byte[] bytes = new byte[2 + NetUtils.StringSize];
+            bytes[0] = Network.Opcode.Message;
+            bytes[1] = (byte)CpeMessageType.Normal;
+            
+            byte[] frameBytes = ToBytes();
+            if (frameBytes.Length > NetUtils.StringSize) { p.Message("&cToo big!!"); return; }
+            
+            for (int i = 0; i < NetUtils.StringSize; i++) {
+                if (i >= frameBytes.Length) {
+                    bytes[i+2] = (byte)' '; //pad with spaces
+                    continue;
+                }
+                bytes[i+2] = frameBytes[i];
+            }
+            
+            p.Send(bytes);
+            //p.Message(frameBytes[0].ToString());
+        }
+        
+        public byte[] ToBytes() {
+            List<byte> bytes = new List<byte>();
+            
+            byte transFlag = useTranslation ? TRANS_FLAG : (byte)0;
+            byte relFlag   = useRelative    ? REL_FLAG   : (byte)0;
+            byte rotFlag   = useRotation    ? ROT_FLAG   : (byte)0;
+            
+            byte flags = (byte)(transFlag | relFlag | rotFlag);
+            bytes.Add(flags);
+            
+            if (useTranslation) {
+                bytes.AddRange(BitConverter.GetBytes(translation.X));
+                bytes.AddRange(BitConverter.GetBytes(translation.Y));
+                bytes.AddRange(BitConverter.GetBytes(translation.Z));
+            }
+            if (useRelative) {
+                sbyte x = (sbyte)relTranslation.X;
+                sbyte y = (sbyte)relTranslation.Y;
+                sbyte z = (sbyte)relTranslation.Z;
+                
+                bytes.Add((byte)x);
+                bytes.Add((byte)y);
+                bytes.Add((byte)z);
+            }
+            if (useRotation) {
+                bytes.Add(yaw);
+                bytes.Add(pitch);
+            }
+            
+            return bytes.ToArray();
+        }
+        
+        public static KeyFrame FromBytes(byte[] stream, ref int pointer) {
+            KeyFrame frame = new KeyFrame();
+            
+            byte flags = stream[pointer];
+            pointer++;
+            
+            frame.useTranslation = ((flags & TRANS_FLAG) > 0) ? true : false;
+            frame.useRelative    = ((flags & REL_FLAG  ) > 0) ? true : false;
+            frame.useRotation    = ((flags & ROT_FLAG  ) > 0) ? true : false;
+            
+            if (frame.useTranslation) {
+                frame.translation.X = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
+                frame.translation.Y = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
+                frame.translation.Z = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
+            }
+            else if (frame.useRelative) {
+                frame.relTranslation.X = (sbyte)stream[pointer]; pointer++;
+                frame.relTranslation.Y = (sbyte)stream[pointer]; pointer++;
+                frame.relTranslation.Z = (sbyte)stream[pointer]; pointer++;
+            }
+            if (frame.useRotation) {
+                frame.yaw   = stream[pointer]; pointer++;
+                frame.pitch = stream[pointer]; pointer++;
+            }
+            
+            return frame;
+        }
+    }
+    
+    public class Tinfo {
+        const CpeMessageType REC_LINE = CpeMessageType.Status3;
+        
+        public Tinfo(Player p) {
+            this.p = p;
+        }
+        public Player p;
         public List<PlayerBot> botList = new List<PlayerBot>();
         public bool[] usedIDs = new bool[64];
+        
+        
+        public KeyFrameList keyFrames = new KeyFrameList();
+        public bool recording { get; private set; }
+        public void StartRecording() {
+            p.Message("&aStarted recording tempbot movement.");
+            p.SendCpeMessage(REC_LINE, "[&c• &fREC]      [%a||||||%8||&f]:");
+            keyFrames.Clear();
+            recording = true;
+        }
+        public void DoRecord() {
+            if (!recording) { return; }
+            
+            var frame = KeyFrame.Make(keyFrames, p.Pos, p.Rot);
+            //p.Message("ORIGINAL:");
+            //frame.Print(p);
+            
+            
+            int pointer = 0;
+            var converted = KeyFrame.FromBytes(frame.ToBytes(), ref pointer);
+            //p.Message("CONVERTED {0}:", pointer);
+            //converted.Print(p);
+            //p.Message("-");
+        }
+        public void StopRecording() {
+            p.Message("&eStopped recording tempbot movement.");
+            p.SendCpeMessage(REC_LINE, "");
+            recording = false;
+            DisplayCode();
+        }
+        void DisplayCode() {
+            List<byte> allBytes = new List<byte>();
+            foreach (var frame in keyFrames) {
+                allBytes.AddRange(frame.ToBytes());
+            }
+            string base64 = Convert.ToBase64String(allBytes.ToArray());
+            
+            if (!Directory.Exists(directory)) { DisplayCodeToChat(base64); return; } //non na2 case
+            
+            File.WriteAllText(fullPath, base64);
+            p.Message("&eYou may find your anim data here:");
+            p.Message("&b"+url);
+            
+        }
+        void DisplayCodeToChat(string base64) {
+            string[] sections = new string[(int)Math.Ceiling(base64.Length / (float)NetUtils.StringSize)];
+            p.Message("Total length: &b{0}&S, sections: &b{1}", base64.Length, sections.Length);
+            for (int i = 0; i < sections.Length; i++) {
+                
+                int start = i * NetUtils.StringSize;
+                int left = base64.Length - start;
+                int end = Math.Min(start + (NetUtils.StringSize - 1), start + (left - 1));
+                int length = (end - start) +1;
+                
+                sections[i] = base64.Substring(start, length);
+                p.Send(Packet.Message(sections[i], CpeMessageType.Normal, p.hasCP437));
+            }
+        }
+        
+        
+        string folder    => "tbotanims/";
+        string directory => "/home/na2/Website-Files/" + folder;
+        string fileName  => p.name+".txt";
+        string fullPath  => directory + fileName;
+        string url       => "https://notawesome.cc/" + folder + fileName;
     }
 	
 	public sealed class PluginTempBot : Plugin {
@@ -294,12 +577,15 @@ namespace MCGalaxy {
 		public override string MCGalaxy_Version { get { return "1.9.0.5"; } }
 		public override string creator { get { return "goodly"; } }
 		
+        public delegate void DoAI(Player p, PlayerBot bot);
+        static Dictionary<string, DoAI> AIDict = new Dictionary<string, DoAI>();
+        
 		public const byte botIDstartValue = 128;
-		public static Dictionary<string, TempBotList> tempBotListAtPlayerName = new Dictionary<string, TempBotList>();
+		public static Dictionary<string, Tinfo> tinfoFor = new Dictionary<string, Tinfo>();
 		
 		public static byte NextFreeID(Player p) {
-		    for (int i = 0; i < tempBotListAtPlayerName[p.name].usedIDs.Length; i++) {
-		        if (!tempBotListAtPlayerName[p.name].usedIDs[i]) {
+		    for (int i = 0; i < tinfoFor[p.name].usedIDs.Length; i++) {
+		        if (!tinfoFor[p.name].usedIDs[i]) {
 		            return (byte)(i + botIDstartValue);
 		        }
 		    }
@@ -321,6 +607,18 @@ namespace MCGalaxy {
 			OnPlayerDisconnectEvent.Register(HandleDisconnect, Priority.High);
 			OnSentMapEvent.Register(HandleSentMap, Priority.High);
 			
+            AIDict["dice"] = DoDiceFall;
+            AIDict["stare"] = DoStare;
+            AIDict["wait"] = DoWait;
+            AIDict["move"] = DoMove;
+            AIDict["anim"] = DoAnim;
+            AIDict["model"] = DoModel;
+            AIDict["remove"] = CmdTempBot.Remove;
+            AIDict["summon"] = DoTP;
+            AIDict["message"] = DoMessage;
+            AIDict["msg"] = DoMessage;
+            AIDict["runscript"] = DoRunScript;
+            
 			Activate();
 		}
 		
@@ -332,21 +630,18 @@ namespace MCGalaxy {
 			OnPlayerDisconnectEvent.Unregister(HandleDisconnect);
 			OnSentMapEvent.Unregister(HandleSentMap);
 			
-			tempBotListAtPlayerName.Clear();
+			tinfoFor.Clear();
 			
 			instance.Cancel(tickBots);
 		}
 		
-		
 		static void HandleDisconnect(Player p, string reason) {
-			tempBotListAtPlayerName.Remove(p.name);
+			tinfoFor.Remove(p.name);
 			
 		}
 		static void HandleSentMap(Player p, Level prevLevel, Level level) {
-			tempBotListAtPlayerName.Remove(p.name);
-
+			tinfoFor.Remove(p.name);
 		}
-		
 		
         static Scheduler instance;
         static SchedulerTask tickBots;
@@ -359,9 +654,12 @@ namespace MCGalaxy {
         static void BotsTick(SchedulerTask task) {
             
             foreach (Player p in PlayerInfo.Online.Items) {
-                if (!tempBotListAtPlayerName.ContainsKey(p.name)) { continue; }
+                if (!tinfoFor.ContainsKey(p.name)) { continue; }
                 
-                List<PlayerBot> bots = tempBotListAtPlayerName[p.name].botList;
+                Tinfo tinfo = tinfoFor[p.name];
+                tinfo.DoRecord();
+                
+                List<PlayerBot> bots = tinfo.botList;
                 if (bots.Count == 0) { continue; }
                 for (int j = 0; j < bots.Count; j++) { BotTick(p, bots[j]); }
             }
@@ -369,51 +667,16 @@ namespace MCGalaxy {
 
         static void BotTick(Player p, PlayerBot bot) {
             //p.Message("Oh lawd %1{0}%S is ticking!", bot.name);
-            if (bot.AIName.CaselessStarts("dice")) {
-                DoDiceFall(p, bot);
-                return;
-            }
-            if (bot.AIName.CaselessStarts("stare")) {
-                DoStare(p, bot);
-                return;
-            }
-            if (bot.AIName.CaselessStarts("wait")) {
-                DoWait(p, bot);
-                return;
-            }
-            if (bot.AIName.CaselessStarts("move")) {
-                DoMove(p, bot);
-                return;
-            }
-            if (bot.AIName.CaselessStarts("model")) {
-                DoModel(p, bot);
-                return;
-            }
-            if (bot.AIName.CaselessStarts("remove")) {
-                CmdTempBot.Remove(p, bot.name);
-                return;
-            }
-            if (bot.AIName.CaselessStarts("summon")) {
-                DoTP(p, bot);
-                return;
-            }
-            if (bot.AIName.CaselessStarts("message") || bot.AIName.CaselessStarts("msg")) {
-                DoMesssage(p, bot);
-                return;
-            }
-            if (bot.AIName.CaselessStarts("runscript")) {
-                DoRunScript(p, bot);
-                return;
-            }
+            
             if (string.IsNullOrEmpty(bot.AIName)) { return; }
             
-            string instruction;
-            int charIndex = bot.AIName.IndexOf(',');
-            if (charIndex == -1) {
-                instruction = bot.AIName;
-            } else {
-                instruction = bot.AIName.Substring(0, charIndex);
+            string lowercaseAIName = bot.AIName.SplitSpaces(2)[0].ToLower();
+            if (AIDict.ContainsKey(lowercaseAIName)) {
+                AIDict[lowercaseAIName](p, bot);
+                return;
             }
+            
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             
             if (bot.AIName.StartsWith(" ")) {
                 p.Message("%cUnrecognized bot ai \"%S{0}%c\". Did you accidentally put a space after a comma separator?", instruction);
@@ -423,18 +686,20 @@ namespace MCGalaxy {
             bot.AIName = "";
         }
         
-        static void DoRunScript(Player p, PlayerBot bot) {
-            string instruction;
-            string trailingInstructions = "";
-            int charIndex = bot.AIName.IndexOf(',');
+        static void ParseInstructions(string full, out string instruction, out string trailingInstructions) {
+            trailingInstructions = "";
+            int charIndex = full.IndexOf(',');
             
             if (charIndex == -1) {
-                instruction = bot.AIName;
+                instruction = full;
             } else {
-                instruction = bot.AIName.Substring(0, charIndex);
-                trailingInstructions = bot.AIName.Substring(charIndex+1);
+                instruction = full.Substring(0, charIndex);
+                trailingInstructions = full.Substring(charIndex+1);
             }
-            
+        }
+        
+        static void DoRunScript(Player p, PlayerBot bot) {
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             
             string[] bits = instruction.SplitSpaces(2);
             string runscriptArgs = "DEFAULT ARGS";
@@ -448,18 +713,8 @@ namespace MCGalaxy {
             Command.Find("runscript").Use(p, runscriptArgs);
         }
         
-        static void DoMesssage(Player p, PlayerBot bot) {
-            string instruction;
-            string trailingInstructions = "";
-            int charIndex = bot.AIName.IndexOf(',');
-            
-            if (charIndex == -1) {
-                instruction = bot.AIName;
-            } else {
-                instruction = bot.AIName.Substring(0, charIndex);
-                trailingInstructions = bot.AIName.Substring(charIndex+1);
-            }
-            
+        static void DoMessage(Player p, PlayerBot bot) {
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             
             string[] bits = instruction.SplitSpaces(2);
             string message = "DEFAULT TEMPBOT MESSAGE";
@@ -474,16 +729,7 @@ namespace MCGalaxy {
         }
         
         static void DoTP(Player p, PlayerBot bot) {
-            string instruction;
-            string trailingInstructions = "";
-            int charIndex = bot.AIName.IndexOf(',');
-            
-            if (charIndex == -1) {
-                instruction = bot.AIName;
-            } else {
-                instruction = bot.AIName.Substring(0, charIndex);
-                trailingInstructions = bot.AIName.Substring(charIndex+1);
-            }
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             
             float x = 0, y = 0, z = 0;
             int yaw = 0, pitch = 0;
@@ -518,17 +764,56 @@ namespace MCGalaxy {
             if (actuallySummon) { CmdTempBot.TPBot(p, bot, x, y, z, yaw, pitch); }
         }
         
-        static void DoDiceFall(Player p, PlayerBot bot) {
-            string instruction;
-            string trailingInstructions = "";
-            int charIndex = bot.AIName.IndexOf(',');
+        static void DoAnim(Player p, PlayerBot bot) {
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             
-            if (charIndex == -1) {
-                instruction = bot.AIName;
-            } else {
-                instruction = bot.AIName.Substring(0, charIndex);
-                trailingInstructions = bot.AIName.Substring(charIndex+1);
+            string[] bits = instruction.SplitSpaces(2);
+            string instructionName = bits[0];
+            if (bits.Length < 2) { p.Message("&cNot enough arguments for tempbot anim"); bot.AIName = ""; return; }
+            
+            string baseCode = bits[1];
+            byte[] data = null;
+            try {
+                data = Convert.FromBase64String(baseCode);
+            } catch (Exception e) {
+                p.Message("There was an exception when decoding the animation data (&f{0}&S)", baseCode);
+                p.Message("&c{0}", e.Message);
+                bot.AIName = ""; return;
             }
+            int pointer = 0;
+            KeyFrame frame = KeyFrame.FromBytes(data, ref pointer);
+            
+            
+            //frame.Print(p);
+            if (frame.useTranslation) {
+                bot.Pos = new Position(frame.translation.X, frame.translation.Y, frame.translation.Z);
+            } else if (frame.useRelative) {
+                bot.Pos = new Position(
+                    bot.Pos.X + frame.relTranslation.X,
+                    bot.Pos.Y + frame.relTranslation.Y,
+                    bot.Pos.Z + frame.relTranslation.Z);
+            }
+            if (frame.useRotation) {
+                bot.Rot = new Orientation(frame.yaw, frame.pitch);
+            }
+            
+            p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
+            
+            
+            if (pointer == data.Length) {
+                //end of stream, move on to next botai
+                bot.AIName = trailingInstructions; return;
+            }
+            byte[] newData = new byte[data.Length - pointer];
+            
+            //Copy(Array sourceArray, int sourceIndex, Array destinationArray, int destinationIndex, int length);
+            Array.Copy(data, pointer, newData, 0, newData.Length);
+            
+            bot.AIName = instructionName+" "+Convert.ToBase64String(newData)+","+trailingInstructions;
+        }
+        
+        static void DoDiceFall(Player p, PlayerBot bot) {
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             //dice velocity finalModel altModel1 altModel2 [...]
             
             //[dice] [velocity] [bounceTimes] [finalModel altModel1 altModel2]
@@ -597,16 +882,7 @@ namespace MCGalaxy {
         }
         
         static void DoModel(Player p, PlayerBot bot) {
-            string instruction;
-            string trailingInstructions = "";
-            int charIndex = bot.AIName.IndexOf(',');
-            
-            if (charIndex == -1) {
-                instruction = bot.AIName;
-            } else {
-                instruction = bot.AIName.Substring(0, charIndex);
-                trailingInstructions = bot.AIName.Substring(charIndex+1);
-            }
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             
             
             string[] bits = instruction.Split(' ');
@@ -623,16 +899,7 @@ namespace MCGalaxy {
         }
         
         static void DoStare(Player p, PlayerBot bot) {
-            string instruction;
-            string trailingInstructions = "";
-            int charIndex = bot.AIName.IndexOf(',');
-            
-            if (charIndex == -1) {
-                instruction = bot.AIName;
-            } else {
-                instruction = bot.AIName.Substring(0, charIndex);
-                trailingInstructions = bot.AIName.Substring(charIndex+1);
-            }
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             
             string[] bits = instruction.Split(' ');
             if (bits.Length > 1) {
@@ -655,16 +922,7 @@ namespace MCGalaxy {
         }
         
         static void DoWait(Player p, PlayerBot bot) {
-            string instruction;
-            string trailingInstructions = "";
-            int charIndex = bot.AIName.IndexOf(',');
-            
-            if (charIndex == -1) {
-                instruction = bot.AIName;
-            } else {
-                instruction = bot.AIName.Substring(0, charIndex);
-                trailingInstructions = bot.AIName.Substring(charIndex+1);
-            }
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             
             string[] bits = instruction.Split(' ');
             if (bits.Length > 1) {
@@ -687,16 +945,7 @@ namespace MCGalaxy {
         }
         
         static void DoMove(Player p, PlayerBot bot) {
-            string instruction;
-            string trailingInstructions = "";
-            int charIndex = bot.AIName.IndexOf(',');
-            
-            if (charIndex == -1) {
-                instruction = bot.AIName;
-            } else {
-                instruction = bot.AIName.Substring(0, charIndex);
-                trailingInstructions = bot.AIName.Substring(charIndex+1);
-            }
+            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
             
             Position goal = bot.Pos;
             float speed = 14;
