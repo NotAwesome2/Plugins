@@ -497,6 +497,7 @@ namespace MCGalaxy {
     }
     
     public class Tinfo {
+        const CpeMessageType STOP_LINE = CpeMessageType.Status1;
         const CpeMessageType REC_LINE = CpeMessageType.Status3;
         
         public Tinfo(Player p) {
@@ -511,6 +512,7 @@ namespace MCGalaxy {
         public bool recording { get; private set; }
         public void StartRecording() {
             p.Message("&aStarted recording tempbot movement.");
+            p.SendCpeMessage(STOP_LINE, "&7(stop with /tbot record)");
             p.SendCpeMessage(REC_LINE, "[&c• &fREC]      [%a||||||%8||&f]:");
             keyFrames.Clear();
             recording = true;
@@ -531,6 +533,7 @@ namespace MCGalaxy {
         }
         public void StopRecording() {
             p.Message("&eStopped recording tempbot movement.");
+            p.SendCpeMessage(STOP_LINE, "");
             p.SendCpeMessage(REC_LINE, "");
             recording = false;
             DisplayCode();
