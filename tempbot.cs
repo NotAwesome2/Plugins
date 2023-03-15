@@ -242,8 +242,16 @@ namespace MCGalaxy {
                 p.Message("&c{0}", e.Message);
                 bot.AIName = ""; return;
             }
+            
             int pointer = 0;
-            KeyFrame frame = KeyFrame.FromBytes(data, ref pointer);
+            KeyFrame frame;
+            try {
+                frame = KeyFrame.FromBytes(data, ref pointer);
+            } catch (Exception e) {
+                p.Message("There was an exception when decoding an animation frame");
+                p.Message("&c{0}", e.Message);
+                bot.AIName = ""; return;
+            }
             
             
             //frame.Print(p);
@@ -1053,8 +1061,8 @@ namespace MCGalaxy {
                 //frame.Print(p);
                 
                 
-                int pointer = 0;
-                var converted = KeyFrame.FromBytes(frame.ToBytes(), ref pointer);
+                //int pointer = 0;
+                //var converted = KeyFrame.FromBytes(frame.ToBytes(), ref pointer);
                 
                 //p.Message("CONVERTED {0}:", pointer);
                 //converted.Print(p);
