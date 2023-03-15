@@ -258,6 +258,9 @@ namespace MCGalaxy {
             if (frame.useRotation) {
                 bot.Rot = new Orientation(frame.yaw, frame.pitch);
             }
+            if (frame.useModel) {
+                CmdTempBot.SetModel(p, bot, frame.model);
+            }
             
             p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
             
@@ -846,13 +849,14 @@ namespace MCGalaxy {
         public struct KeyFrame {
             //RotY = yaw; HeadX = pitch;
             
-            public static KeyFrame Make(KeyFrameList list, Position pos, Orientation rot) {
+            public static KeyFrame Make(KeyFrameList list, Position pos, Orientation rot, string model) {
                 KeyFrame the = new KeyFrame();
                 
                 
                 the.translation = new Vec3I(pos.X, pos.Y, pos.Z);
                 the.yaw = rot.RotY;
                 the.pitch = rot.HeadX;
+                the.model = model;
                 
                 if (list.Count == 0) {
                     the.useTranslation = true;
@@ -866,6 +870,7 @@ namespace MCGalaxy {
                 
                 if (the.yaw == prev.yaw && the.pitch == prev.pitch) { the.useRotation = false; } else { the.useRotation = true; }
                 
+                if (prev.model == the.model) { the.useModel = false; } else { the.useModel = true; }
                 
                 if (the.relTranslation.X == 0 && the.relTranslation.Y == 0 && the.relTranslation.Z == 0) {
                     //no translation from previous frame
@@ -884,6 +889,7 @@ namespace MCGalaxy {
                 }
                 
                 the.useTranslation = true;
+                
                 list.Add(the);
                 return the;
             }
@@ -892,15 +898,18 @@ namespace MCGalaxy {
             const byte TRANS_FLAG = (byte)(1 << 0);
             const byte REL_FLAG   = (byte)(1 << 1);
             const byte ROT_FLAG   = (byte)(1 << 2);
+            const byte MOD_FLAG   = (byte)(1 << 3);
+
             
             public bool useTranslation;
             public bool useRelative;
             public bool useRotation;
-
+            public bool useModel;
             
             public Vec3I translation;
             public Vec3I relTranslation;
             public byte yaw, pitch;
+            public string model;
             
             public void Print(Player p) {
                 //string base64 = Convert.ToBase64String(ToBytes());
@@ -914,7 +923,10 @@ namespace MCGalaxy {
                 if (useRotation) {
                     p.Message("&xYaw pitch: {0} {1}", yaw, pitch);
                 }
-                if (!useTranslation && !useRelative && !useRotation) {
+                if (useModel) {
+                    p.Message("&xModel: {0}", model);
+                }
+                if (!useTranslation && !useRelative && !useRotation && !useModel) {
                     p.Message("(no change)");
                 }
             }
@@ -944,8 +956,9 @@ namespace MCGalaxy {
                 byte transFlag = useTranslation ? TRANS_FLAG : (byte)0;
                 byte relFlag   = useRelative    ? REL_FLAG   : (byte)0;
                 byte rotFlag   = useRotation    ? ROT_FLAG   : (byte)0;
+                byte modFlag   = useModel       ? MOD_FLAG   : (byte)0;
                 
-                byte flags = (byte)(transFlag | relFlag | rotFlag);
+                byte flags = (byte)(transFlag | relFlag | rotFlag | modFlag);
                 bytes.Add(flags);
                 
                 if (useTranslation) {
@@ -966,6 +979,12 @@ namespace MCGalaxy {
                     bytes.Add(yaw);
                     bytes.Add(pitch);
                 }
+                if (useModel) {
+                    byte[] stringBytes = new byte[NetUtils.StringSize];
+                    //NetUtils.Write(string str, byte[] array, int offset, bool hasCP437);
+                    NetUtils.Write(model, stringBytes, 0, false);
+                    bytes.AddRange(stringBytes);
+                }
                 
                 return bytes.ToArray();
             }
@@ -979,6 +998,7 @@ namespace MCGalaxy {
                 frame.useTranslation = ((flags & TRANS_FLAG) > 0) ? true : false;
                 frame.useRelative    = ((flags & REL_FLAG  ) > 0) ? true : false;
                 frame.useRotation    = ((flags & ROT_FLAG  ) > 0) ? true : false;
+                frame.useModel       = ((flags & MOD_FLAG  ) > 0) ? true : false;
                 
                 if (frame.useTranslation) {
                     frame.translation.X = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
@@ -993,6 +1013,10 @@ namespace MCGalaxy {
                 if (frame.useRotation) {
                     frame.yaw   = stream[pointer]; pointer++;
                     frame.pitch = stream[pointer]; pointer++;
+                }
+                if (frame.useModel) {
+                    //NetUtils.ReadString(byte[] data, int offset);
+                    frame.model = NetUtils.ReadString(stream, pointer); pointer += NetUtils.StringSize;
                 }
                 
                 return frame;
@@ -1023,13 +1047,15 @@ namespace MCGalaxy {
             public void DoRecord() {
                 if (!recording) { return; }
                 
-                var frame = KeyFrame.Make(keyFrames, p.Pos, p.Rot);
+                var frame = KeyFrame.Make(keyFrames, p.Pos, p.Rot, p.Model);
+                
                 //p.Message("ORIGINAL:");
                 //frame.Print(p);
                 
                 
                 int pointer = 0;
                 var converted = KeyFrame.FromBytes(frame.ToBytes(), ref pointer);
+                
                 //p.Message("CONVERTED {0}:", pointer);
                 //converted.Print(p);
                 //p.Message("-");
@@ -1039,6 +1065,9 @@ namespace MCGalaxy {
                 p.SendCpeMessage(STOP_LINE, "");
                 p.SendCpeMessage(REC_LINE, "");
                 recording = false;
+                //foreach (var frame in keyFrames) {
+                //    frame.Print(p);
+                //}
                 DisplayCode();
             }
             void DisplayCode() {
