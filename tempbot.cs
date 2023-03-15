@@ -18,566 +18,15 @@ using MCGalaxy.Tasks;
 using MCGalaxy.DB;
 
 using Vec3I = MCGalaxy.Maths.Vec3S32;
-using KeyFrameList = System.Collections.Generic.List<MCGalaxy.KeyFrame>;
-
-using static MCGalaxy.PluginTempBot;
+using KeyFrameList = System.Collections.Generic.List<MCGalaxy.PluginTempBot.KeyFrame>;
 
 //unknownshadow200: well player ids go from 0 up to 255. normal bots go from 127 down to 64, then 254 down to 127, then finally 63 down to 0.
 
 namespace MCGalaxy {
     
-    public sealed class CmdTempBot : Command2 {   
-        public override string name { get { return "tempbot"; } }
-        public override string shortcut { get { return "tbot"; } }
-        public override string type { get { return CommandTypes.Other; } }
-        public override bool museumUsable { get { return false; } }
-        public override LevelPermission defaultRank { get { return LevelPermission.Operator; } }
-        
-        public override void Use(Player p, string message, CommandData data) {		
-            if (message.CaselessEq("where")) { DoWhere(p); return; }
-            if (!CanUse(p, data)) { return; }
-            
-            if (message.Length == 0) { Help(p); return; }
-            string[] args = message.SplitSpaces(2);
-            
-            
-            if (args[0].CaselessEq("add")) {
-                if (args.Length < 2) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch. Skin and botNick are optional."); return; }
-                TryAdd(p, args[1]);
-                return;
-            }
-            
-            if (args[0].CaselessEq("remove")) {
-                if (args.Length < 2) { p.Message("%cYou must provide a botName to remove."); return; }
-                TryRemove(p, args[1]);
-                return;
-            }
-            
-            if (args[0].CaselessEq("model")) {
-                if (args.Length < 2) { p.Message("%cYou need args for botName and modelName."); return; }
-                TrySetModel(p, args[1]);
-                return;
-            }
-            
-            if (args[0].CaselessEq("skin")) {
-                if (args.Length < 2) { p.Message("%cYou need args for botName and skinName."); return; }
-                TrySetSkin(p, args[1]);
-                return;
-            }
-            
-            if (args[0].CaselessEq("ai")) {
-                if (args.Length < 2) { p.Message("%cYou need args for botName and AIName."); return; }
-                TrySetAIName(p, args[1]);
-                return;
-            }
-            
-            if (args[0].CaselessEq("summon")) {
-                if (args.Length < 2) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch."); return; }
-                TryTP(p, args[1]);
-                return;
-            }
-            
-            if (args[0].CaselessEq("record")) {
-                ToggleRecord(p);
-                return;
-            }
-            
-            Help(p);
-        }
-        
-        static void ToggleRecord(Player p) {
-            if (!tinfoFor.ContainsKey(p.name)) {
-				tinfoFor[p.name] = new Tinfo(p);
-			}
-            Tinfo tinfo = tinfoFor[p.name];
-            if (!tinfo.recording) {
-                tinfo.StartRecording();
-            } else {
-                tinfo.StopRecording();
-            }
-        }
-        
-        static void DoWhere(Player p) {
-            //-16 so it's centered on the block instead of min corner
-            Vec3F32 pos = new Vec3F32(p.Pos.X-16, p.Pos.Y - Entities.CharacterHeight, p.Pos.Z-16);
-            pos.X /= 32;
-            pos.Y /= 32;
-            pos.Z /= 32;
-            
-            p.Send(Packet.Message(
-                pos.X + " " + pos.Y + " " + pos.Z+" "+Orientation.PackedToDegrees(p.Rot.RotY)+" "+Orientation.PackedToDegrees(p.Rot.HeadX),
-                                  CpeMessageType.Normal, p.hasCP437));
-        }
-        
-        static bool CanUse(Player p, CommandData data) {
-			if (!(p.group.Permission >= LevelPermission.Operator)) {
-				if (!Hacks.CanUseHacks(p)) {
-					if (data.Context != CommandContext.MessageBlock) {
-						p.Message("%cYou cannot use this command manually when hacks are disabled.");
-						return false;
-					}
-				}
-			}
-            return true;
-        }
-        
-        void TryAdd(Player p, string message) {
-                string[] args = message.SplitSpaces(8);
-                if (args.Length < 6) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch. Skin and botNick are optional."); return; }
-                
-                string botName    = args[0];
-                if (!Formatter.ValidName(p, botName, "bot")) return;
-                float x = 0, y = 0, z = 0;
-                int yaw = 0, pitch = 0;
-                string skin       = (args.Length < 7) ? botName : args[6];
-                string botNick    = (args.Length < 8) ? botName : args[7];
-                //p.Rot.
-                if (!CommandParser.GetReal(p, args[1], "x position", ref x)) { return; }
-                if (!CommandParser.GetReal(p, args[2], "y position", ref y)) { return; }
-                if (!CommandParser.GetReal(p, args[3], "z position", ref z)) { return; }
-                if (!CommandParser.GetInt(p,  args[4], "yaw", ref yaw)) { return; }
-                if (!CommandParser.GetInt(p,  args[5], "pitch", ref pitch)) { return; }
-                Add(p, botName, x, y, z, yaw, pitch, skin, botNick);
-        }
-        
-        void Add(Player p, string botName, float x, float y, float z, int yaw, int pitch, string skin, string botNick = "empty") {
-            if (!tinfoFor.ContainsKey(p.name)) {
-				tinfoFor[p.name] = new Tinfo(p);
-			}
-			
-            
-            foreach (PlayerBot b in tinfoFor[p.name].botList) {
-                if (botName.CaselessEq(b.name)) {
-                    //p.Message("%cThere is already a tempbot with that name.");
-                    return;
-                }
-            }
-            
-            byte ID = PluginTempBot.NextFreeID(p);
-            if (ID == 0) {
-                p.Message("%cReached the limit of tempbots allowed.");
-                return;
-            }
-            tinfoFor[p.name].usedIDs[ID - PluginTempBot.botIDstartValue] = true;
-            
-            PlayerBot bot = new PlayerBot(botName, p.level);
-            bot.DisplayName = botNick;
-            //+16 so that it's centered on the block instead of min corner
-            Position pos = Position.FromFeet((int)(x*32) +16, (int)(y*32), (int)(z*32) +16);
-            
-            bot.SetInitialPos(pos);
-            byte byteYaw = Orientation.DegreesToPacked(yaw);
-            byte bytePitch = Orientation.DegreesToPacked(pitch);
-            bot.SetYawPitch(byteYaw, bytePitch);
-            bot.SkinName = skin;
-            //bot.AIName = "stare";
-            bot.id = ID;
-
-            //p.Message("Picked {0} as ID for {1}", bot.id, bot.name);
-            tinfoFor[p.name].botList.Add(bot);
-            
-            Entities.Spawn(p, bot);
-        }
-        
-        void TryRemove(Player p, string message) {
-            string[] args = message.Split(' ');
-            Remove(p, args[0]);
-        }
-        
-        public static void Remove(Player p, string botName) {
-            PlayerBot bot = GetBotAtName(p, botName);
-            Remove(p, bot);
-        }
-        public static void Remove(Player p, PlayerBot bot) {
-            if (bot != null) {
-                Entities.Despawn(p, bot);
-                //p.Message("Successfully removed {0} with ID of {1}", bot.name, bot.id);
-                //p.Message("ID {0} is now freed from index {1}", bot.id, bot.id - botIDstartValue);
-                
-                tinfoFor[p.name].usedIDs[bot.id - botIDstartValue] = false;
-                tinfoFor[p.name].botList.Remove(bot);
-            }
-        }
-        
-        void TrySetModel(Player p, string message) {
-            string[] args = message.SplitSpaces(2);
-            if (args.Length < 2) { p.Message("%cYou need args for botName and modelName."); return; }
-            
-            PlayerBot bot = GetBotAtName(p, args[0]);
-            if (bot != null) {
-                SetModel(p, bot, args[1]);
-            }
-        }
-        
-        public static void SetModel(Player p, PlayerBot bot, string modelName) {
-            bot.Model = modelName;
-            if (p.Supports(CpeExt.ChangeModel)) {
-				OnSendingModelEvent.Call(bot, ref modelName, p);
-                p.Send(Packet.ChangeModel(bot.id, modelName, p.hasCP437));
-            }
-        }
-        
-        void TrySetSkin(Player p, string message) {
-            string[] args = message.SplitSpaces(2);
-            if (args.Length < 2) { p.Message("%cYou need args for botName and skinName."); return; }
-            
-            PlayerBot bot = GetBotAtName(p, args[0]);
-            if (bot != null) {
-                SetSkin(p, bot, args[1]);
-            }
-        }
-        
-        public static void SetSkin(Player p, PlayerBot bot, string skinName) {
-            bot.SkinName = skinName;
-            
-            //       SendSpawnEntity(byte id, string name, string skin, Position pos, Orientation rot);
-            p.Session.SendSpawnEntity(bot.id, bot.DisplayName, bot.SkinName, bot.Pos, bot.Rot);
-        }
-        
-        void TryTP(Player p, string message) {
-            string[] args = message.Split(' ');
-            if (args.Length < 6) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch."); return; }
-            PlayerBot bot = GetBotAtName(p, args[0]);
-            if (bot != null) {
-                float x = 0, y = 0, z = 0;
-                int yaw = 0, pitch = 0;
-                if (!CommandParser.GetReal(p, args[1], "x position", ref x)) { return; }
-                if (!CommandParser.GetReal(p, args[2], "y position", ref y)) { return; }
-                if (!CommandParser.GetReal(p, args[3], "z position", ref z)) { return; }
-                if (!CommandParser.GetInt(p,  args[4], "yaw", ref yaw)) { return; }
-                if (!CommandParser.GetInt(p,  args[5], "pitch", ref pitch)) { return; }
-                TPBot(p, bot, x, y, z, yaw, pitch);
-            }
-        }
-        public static void TPBot(Player p, PlayerBot bot, float x, float y, float z, int yaw, int pitch) {
-            Position pos = Position.FromFeet((int)(x*32) +16, (int)(y*32), (int)(z*32) +16);
-            bot.Pos = pos;
-            
-            //looks weird if their head snaps then instantly looks at you again...
-            if (!bot.AIName.CaselessStarts("stare")) {
-                byte byteYaw = Orientation.DegreesToPacked(yaw);
-                byte bytePitch = Orientation.DegreesToPacked(pitch);
-                Orientation rot = bot.Rot;
-                rot.HeadX = bytePitch;
-                rot.RotY = byteYaw;
-                bot.Rot = rot;
-            }
-            
-            p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
-        }
-        
-        void TrySetAIName(Player p, string message) {
-            string[] args = message.SplitSpaces(2);
-            if (args.Length < 2) { p.Message("%cYou need args for botName and AIName"); return; }
-            PlayerBot bot = GetBotAtName(p, args[0]);
-            if (bot != null) {
-                SetAIName(p, bot, args[1]);
-            }
-        }
-        void SetAIName(Player p, PlayerBot bot, string AIName) {
-            bot.AIName = AIName;
-        }
-        
-        static PlayerBot GetBotAtName(Player p, string botName) {
-            Tinfo list;
-            if (!tinfoFor.TryGetValue(p.name, out list) || list.botList.Count == 0)
-            {
-                //p.Message("No tempbots currently exist.");
-                return null;
-            }
-            foreach (PlayerBot bot in list.botList) {
-                if (bot.name.CaselessEq(botName)) {
-                    return bot;
-                }
-            }
-            //p.Message("No tempbots match \"{0}\".", botName);
-            return null;
-        }
-		
-        public override void Help(Player p) {
-            p.Message("%T/TempBot add [botName] [x y z] [yaw pitch] <skin> <botNick>");
-            p.Message("%H Places a client-side bot.");
-            p.Message("%T/TempBot summon [botName] [x y z] [yaw pitch]");
-            p.Message("%H Summons a client-side bot.");
-            p.Message("%T/TempBot remove [botName]");
-            p.Message("%H Removes a client-side bot.");
-            p.Message("%T/TempBot model [botName] [model name]");
-            p.Message("%H Sets model of a client-side bot.");
-            p.Message("%T/TempBot skin [botName] [skin name]");
-            p.Message("%H Sets skin of a client-side bot.");
-            p.Message("%T/TempBot ai [botName] [ai arguments]");
-            p.Message("%H Sets ai. Use %T/help tempbot ai %Hfor more info.");
-            p.Message("%T/TempBot where %H- puts your current X, Y, Z, yaw and pitch into chat for copy pasting.");
-        }
-        
-        public override void Help(Player p, string message) {
-            if (message.CaselessEq("ai")) {
-                p.Message("%HValid AI actions for tempbots:");
-                p.Message("%Tstare <time in tenths of a second>");
-                p.Message("%H No time provided means stare forever.");
-                p.Message("%Twait [time]");
-                p.Message("%H Waits for [time in tenths of a second]");
-                p.Message("%Tmove [X Y Z] <speed>");
-                p.Message("%H <speed> is optional, default is 14.");
-                p.Message("%Tanim [anim data]");
-                p.Message("%H Get anim data from toggling &b/tbot record");
-                p.Message("%Tsummon [X Y Z] [yaw pitch]");
-                p.Message("%H Instantly teleports this tempbot.");
-                p.Message("%Tmodel [modelname]");
-                p.Message("%H Sets model.");
-                p.Message("%Tmsg [message]");
-                p.Message("%H You can't use commas in the message!");
-                p.Message("%H Use ; instead and it will become ,");
-                p.Message("%Tremove");
-                p.Message("%H Removes this tempbot.");
-                p.Message("%HYou can chain AI together with commas. e.g:");
-                p.Message("%Hstare 10,wait 20,move 32 64 30");
-                p.Message("%HPlease note the (lack of) spaces.");
-                return;
-            }
-            Help(p);
-        }
-		
-    }
-    
-    public struct KeyFrame {
-        //RotY = yaw; HeadX = pitch;
-        
-        public static KeyFrame Make(KeyFrameList list, Position pos, Orientation rot) {
-            KeyFrame the = new KeyFrame();
-            
-            
-            the.translation = new Vec3I(pos.X, pos.Y, pos.Z);
-            the.yaw = rot.RotY;
-            the.pitch = rot.HeadX;
-            
-            if (list.Count == 0) {
-                the.useTranslation = true;
-                the.useRotation = true;
-                list.Add(the);
-                return the;
-            }
-            var prev = list[list.Count-1]; //maybe this should be a stack
-            
-            the.relTranslation = the.translation - prev.translation;
-            
-            if (the.yaw == prev.yaw && the.pitch == prev.pitch) { the.useRotation = false; } else { the.useRotation = true; }
-            
-            
-            if (the.relTranslation.X == 0 && the.relTranslation.Y == 0 && the.relTranslation.Z == 0) {
-                //no translation from previous frame
-                list.Add(the);
-                return the;
-            }
-            
-            
-            if (the.relTranslation.X >= sbyte.MinValue && the.relTranslation.X <= sbyte.MaxValue &&
-                the.relTranslation.Y >= sbyte.MinValue && the.relTranslation.Y <= sbyte.MaxValue &&
-                the.relTranslation.Z >= sbyte.MinValue && the.relTranslation.Z <= sbyte.MaxValue) {
-                    
-                the.useRelative = true;
-                list.Add(the);
-                return the;
-            }
-            
-            the.useTranslation = true;
-            list.Add(the);
-            return the;
-        }
-        
-        
-        const byte TRANS_FLAG = (byte)(1 << 0);
-        const byte REL_FLAG   = (byte)(1 << 1);
-        const byte ROT_FLAG   = (byte)(1 << 2);
-        
-        public bool useTranslation;
-        public bool useRelative;
-        public bool useRotation;
-
-        
-        public Vec3I translation;
-        public Vec3I relTranslation;
-        public byte yaw, pitch;
-        
-        public void Print(Player p) {
-            //string base64 = Convert.ToBase64String(ToBytes());
-            //p.Message(base64);
-            if (useTranslation) {
-                p.Message("&xTranslation: {0} {1} {2}", translation.X, translation.Y, translation.Z);
-            }
-            if (useRelative) {
-                p.Message("&xRelative: {0} {1} {2}", relTranslation.X, relTranslation.Y, relTranslation.Z);
-            }
-            if (useRotation) {
-                p.Message("&xYaw pitch: {0} {1}", yaw, pitch);
-            }
-            if (!useTranslation && !useRelative && !useRotation) {
-                p.Message("(no change)");
-            }
-        }
-        public void PrintBytes(Player p) {
-            byte[] bytes = new byte[2 + NetUtils.StringSize];
-            bytes[0] = Network.Opcode.Message;
-            bytes[1] = (byte)CpeMessageType.Normal;
-            
-            byte[] frameBytes = ToBytes();
-            if (frameBytes.Length > NetUtils.StringSize) { p.Message("&cToo big!!"); return; }
-            
-            for (int i = 0; i < NetUtils.StringSize; i++) {
-                if (i >= frameBytes.Length) {
-                    bytes[i+2] = (byte)' '; //pad with spaces
-                    continue;
-                }
-                bytes[i+2] = frameBytes[i];
-            }
-            
-            p.Send(bytes);
-            //p.Message(frameBytes[0].ToString());
-        }
-        
-        public byte[] ToBytes() {
-            List<byte> bytes = new List<byte>();
-            
-            byte transFlag = useTranslation ? TRANS_FLAG : (byte)0;
-            byte relFlag   = useRelative    ? REL_FLAG   : (byte)0;
-            byte rotFlag   = useRotation    ? ROT_FLAG   : (byte)0;
-            
-            byte flags = (byte)(transFlag | relFlag | rotFlag);
-            bytes.Add(flags);
-            
-            if (useTranslation) {
-                bytes.AddRange(BitConverter.GetBytes(translation.X));
-                bytes.AddRange(BitConverter.GetBytes(translation.Y));
-                bytes.AddRange(BitConverter.GetBytes(translation.Z));
-            }
-            if (useRelative) {
-                sbyte x = (sbyte)relTranslation.X;
-                sbyte y = (sbyte)relTranslation.Y;
-                sbyte z = (sbyte)relTranslation.Z;
-                
-                bytes.Add((byte)x);
-                bytes.Add((byte)y);
-                bytes.Add((byte)z);
-            }
-            if (useRotation) {
-                bytes.Add(yaw);
-                bytes.Add(pitch);
-            }
-            
-            return bytes.ToArray();
-        }
-        
-        public static KeyFrame FromBytes(byte[] stream, ref int pointer) {
-            KeyFrame frame = new KeyFrame();
-            
-            byte flags = stream[pointer];
-            pointer++;
-            
-            frame.useTranslation = ((flags & TRANS_FLAG) > 0) ? true : false;
-            frame.useRelative    = ((flags & REL_FLAG  ) > 0) ? true : false;
-            frame.useRotation    = ((flags & ROT_FLAG  ) > 0) ? true : false;
-            
-            if (frame.useTranslation) {
-                frame.translation.X = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
-                frame.translation.Y = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
-                frame.translation.Z = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
-            }
-            else if (frame.useRelative) {
-                frame.relTranslation.X = (sbyte)stream[pointer]; pointer++;
-                frame.relTranslation.Y = (sbyte)stream[pointer]; pointer++;
-                frame.relTranslation.Z = (sbyte)stream[pointer]; pointer++;
-            }
-            if (frame.useRotation) {
-                frame.yaw   = stream[pointer]; pointer++;
-                frame.pitch = stream[pointer]; pointer++;
-            }
-            
-            return frame;
-        }
-    }
-    
-    public class Tinfo {
-        const CpeMessageType STOP_LINE = CpeMessageType.Status1;
-        const CpeMessageType REC_LINE = CpeMessageType.Status3;
-        
-        public Tinfo(Player p) {
-            this.p = p;
-        }
-        public Player p;
-        public List<PlayerBot> botList = new List<PlayerBot>();
-        public bool[] usedIDs = new bool[64];
-        
-        
-        public KeyFrameList keyFrames = new KeyFrameList();
-        public bool recording { get; private set; }
-        public void StartRecording() {
-            p.Message("&aStarted recording tempbot movement.");
-            p.SendCpeMessage(STOP_LINE, "&7(stop with /tbot record)");
-            p.SendCpeMessage(REC_LINE, "[&c• &fREC]      [%a||||||%8||&f]:");
-            keyFrames.Clear();
-            recording = true;
-        }
-        public void DoRecord() {
-            if (!recording) { return; }
-            
-            var frame = KeyFrame.Make(keyFrames, p.Pos, p.Rot);
-            //p.Message("ORIGINAL:");
-            //frame.Print(p);
-            
-            
-            int pointer = 0;
-            var converted = KeyFrame.FromBytes(frame.ToBytes(), ref pointer);
-            //p.Message("CONVERTED {0}:", pointer);
-            //converted.Print(p);
-            //p.Message("-");
-        }
-        public void StopRecording() {
-            p.Message("&eStopped recording tempbot movement.");
-            p.SendCpeMessage(STOP_LINE, "");
-            p.SendCpeMessage(REC_LINE, "");
-            recording = false;
-            DisplayCode();
-        }
-        void DisplayCode() {
-            List<byte> allBytes = new List<byte>();
-            foreach (var frame in keyFrames) {
-                allBytes.AddRange(frame.ToBytes());
-            }
-            string base64 = Convert.ToBase64String(allBytes.ToArray());
-            
-            if (!Directory.Exists(directory)) { DisplayCodeToChat(base64); return; } //non na2 case
-            
-            File.WriteAllText(fullPath, base64);
-            p.Message("&eYou may find your anim data here:");
-            p.Message("&b"+url);
-            
-        }
-        void DisplayCodeToChat(string base64) {
-            string[] sections = new string[(int)Math.Ceiling(base64.Length / (float)NetUtils.StringSize)];
-            p.Message("Total length: &b{0}&S, sections: &b{1}", base64.Length, sections.Length);
-            for (int i = 0; i < sections.Length; i++) {
-                
-                int start = i * NetUtils.StringSize;
-                int left = base64.Length - start;
-                int end = Math.Min(start + (NetUtils.StringSize - 1), start + (left - 1));
-                int length = (end - start) +1;
-                
-                sections[i] = base64.Substring(start, length);
-                p.Send(Packet.Message(sections[i], CpeMessageType.Normal, p.hasCP437));
-            }
-        }
-        
-        
-        string folder    => "tbotanims/";
-        string directory => "/home/na2/Website-Files/" + folder;
-        string fileName  => p.name+".txt";
-        string fullPath  => directory + fileName;
-        string url       => "https://notawesome.cc/" + folder + fileName;
-    }
-	
 	public sealed class PluginTempBot : Plugin {
 		public override string name { get { return "tempbot"; } }
-		public override string MCGalaxy_Version { get { return "1.9.0.5"; } }
+		public override string MCGalaxy_Version { get { return "1.9.4.7"; } }
 		public override string creator { get { return "goodly"; } }
 		
         public delegate void DoAI(Player p, PlayerBot bot);
@@ -1053,233 +502,783 @@ namespace MCGalaxy {
             return Vec3F32.Normalise(dir);
         }
         
+        
         public class DestInfo {
             public bool reachedDest = false;
             public bool shouldTurnHead = true;
         }
         
+        public sealed class CmdTempBot : Command2 {   
+            public override string name { get { return "tempbot"; } }
+            public override string shortcut { get { return "tbot"; } }
+            public override string type { get { return CommandTypes.Other; } }
+            public override bool museumUsable { get { return false; } }
+            public override LevelPermission defaultRank { get { return LevelPermission.Operator; } }
+            
+            public override void Use(Player p, string message, CommandData data) {		
+                if (message.CaselessEq("where")) { DoWhere(p); return; }
+                if (!CanUse(p, data)) { return; }
+                
+                if (message.Length == 0) { Help(p); return; }
+                string[] args = message.SplitSpaces(2);
+                
+                
+                if (args[0].CaselessEq("add")) {
+                    if (args.Length < 2) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch. Skin and botNick are optional."); return; }
+                    TryAdd(p, args[1]);
+                    return;
+                }
+                
+                if (args[0].CaselessEq("remove")) {
+                    if (args.Length < 2) { p.Message("%cYou must provide a botName to remove."); return; }
+                    TryRemove(p, args[1]);
+                    return;
+                }
+                
+                if (args[0].CaselessEq("model")) {
+                    if (args.Length < 2) { p.Message("%cYou need args for botName and modelName."); return; }
+                    TrySetModel(p, args[1]);
+                    return;
+                }
+                
+                if (args[0].CaselessEq("skin")) {
+                    if (args.Length < 2) { p.Message("%cYou need args for botName and skinName."); return; }
+                    TrySetSkin(p, args[1]);
+                    return;
+                }
+                
+                if (args[0].CaselessEq("ai")) {
+                    if (args.Length < 2) { p.Message("%cYou need args for botName and AIName."); return; }
+                    TrySetAIName(p, args[1]);
+                    return;
+                }
+                
+                if (args[0].CaselessEq("summon")) {
+                    if (args.Length < 2) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch."); return; }
+                    TryTP(p, args[1]);
+                    return;
+                }
+                
+                if (args[0].CaselessEq("record")) {
+                    ToggleRecord(p);
+                    return;
+                }
+                
+                Help(p);
+            }
+            
+            static void ToggleRecord(Player p) {
+                if (!tinfoFor.ContainsKey(p.name)) {
+                    tinfoFor[p.name] = new Tinfo(p);
+                }
+                Tinfo tinfo = tinfoFor[p.name];
+                if (!tinfo.recording) {
+                    tinfo.StartRecording();
+                } else {
+                    tinfo.StopRecording();
+                }
+            }
+            
+            static void DoWhere(Player p) {
+                //-16 so it's centered on the block instead of min corner
+                Vec3F32 pos = new Vec3F32(p.Pos.X-16, p.Pos.Y - Entities.CharacterHeight, p.Pos.Z-16);
+                pos.X /= 32;
+                pos.Y /= 32;
+                pos.Z /= 32;
+                
+                p.Send(Packet.Message(
+                    pos.X + " " + pos.Y + " " + pos.Z+" "+Orientation.PackedToDegrees(p.Rot.RotY)+" "+Orientation.PackedToDegrees(p.Rot.HeadX),
+                                      CpeMessageType.Normal, p.hasCP437));
+            }
+            
+            static bool CanUse(Player p, CommandData data) {
+                if (!(p.group.Permission >= LevelPermission.Operator)) {
+                    if (!Hacks.CanUseHacks(p)) {
+                        if (data.Context != CommandContext.MessageBlock) {
+                            p.Message("%cYou cannot use this command manually when hacks are disabled.");
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+            
+            void TryAdd(Player p, string message) {
+                    string[] args = message.SplitSpaces(8);
+                    if (args.Length < 6) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch. Skin and botNick are optional."); return; }
+                    
+                    string botName    = args[0];
+                    if (!Formatter.ValidName(p, botName, "bot")) return;
+                    float x = 0, y = 0, z = 0;
+                    int yaw = 0, pitch = 0;
+                    string skin       = (args.Length < 7) ? botName : args[6];
+                    string botNick    = (args.Length < 8) ? botName : args[7];
+                    //p.Rot.
+                    if (!CommandParser.GetReal(p, args[1], "x position", ref x)) { return; }
+                    if (!CommandParser.GetReal(p, args[2], "y position", ref y)) { return; }
+                    if (!CommandParser.GetReal(p, args[3], "z position", ref z)) { return; }
+                    if (!CommandParser.GetInt(p,  args[4], "yaw", ref yaw)) { return; }
+                    if (!CommandParser.GetInt(p,  args[5], "pitch", ref pitch)) { return; }
+                    Add(p, botName, x, y, z, yaw, pitch, skin, botNick);
+            }
+            
+            void Add(Player p, string botName, float x, float y, float z, int yaw, int pitch, string skin, string botNick = "empty") {
+                if (!tinfoFor.ContainsKey(p.name)) {
+                    tinfoFor[p.name] = new Tinfo(p);
+                }
+                
+                
+                foreach (PlayerBot b in tinfoFor[p.name].botList) {
+                    if (botName.CaselessEq(b.name)) {
+                        //p.Message("%cThere is already a tempbot with that name.");
+                        return;
+                    }
+                }
+                
+                byte ID = PluginTempBot.NextFreeID(p);
+                if (ID == 0) {
+                    p.Message("%cReached the limit of tempbots allowed.");
+                    return;
+                }
+                tinfoFor[p.name].usedIDs[ID - PluginTempBot.botIDstartValue] = true;
+                
+                PlayerBot bot = new PlayerBot(botName, p.level);
+                bot.DisplayName = botNick;
+                //+16 so that it's centered on the block instead of min corner
+                Position pos = Position.FromFeet((int)(x*32) +16, (int)(y*32), (int)(z*32) +16);
+                
+                bot.SetInitialPos(pos);
+                byte byteYaw = Orientation.DegreesToPacked(yaw);
+                byte bytePitch = Orientation.DegreesToPacked(pitch);
+                bot.SetYawPitch(byteYaw, bytePitch);
+                bot.SkinName = skin;
+                //bot.AIName = "stare";
+                bot.id = ID;
+
+                //p.Message("Picked {0} as ID for {1}", bot.id, bot.name);
+                tinfoFor[p.name].botList.Add(bot);
+                
+                Entities.Spawn(p, bot);
+            }
+            
+            void TryRemove(Player p, string message) {
+                string[] args = message.Split(' ');
+                Remove(p, args[0]);
+            }
+            
+            public static void Remove(Player p, string botName) {
+                PlayerBot bot = GetBotAtName(p, botName);
+                Remove(p, bot);
+            }
+            public static void Remove(Player p, PlayerBot bot) {
+                if (bot != null) {
+                    Entities.Despawn(p, bot);
+                    //p.Message("Successfully removed {0} with ID of {1}", bot.name, bot.id);
+                    //p.Message("ID {0} is now freed from index {1}", bot.id, bot.id - botIDstartValue);
+                    
+                    tinfoFor[p.name].usedIDs[bot.id - botIDstartValue] = false;
+                    tinfoFor[p.name].botList.Remove(bot);
+                }
+            }
+            
+            void TrySetModel(Player p, string message) {
+                string[] args = message.SplitSpaces(2);
+                if (args.Length < 2) { p.Message("%cYou need args for botName and modelName."); return; }
+                
+                PlayerBot bot = GetBotAtName(p, args[0]);
+                if (bot != null) {
+                    SetModel(p, bot, args[1]);
+                }
+            }
+            
+            public static void SetModel(Player p, PlayerBot bot, string modelName) {
+                bot.Model = modelName;
+                if (p.Supports(CpeExt.ChangeModel)) {
+                    OnSendingModelEvent.Call(bot, ref modelName, p);
+                    p.Send(Packet.ChangeModel(bot.id, modelName, p.hasCP437));
+                }
+            }
+            
+            void TrySetSkin(Player p, string message) {
+                string[] args = message.SplitSpaces(2);
+                if (args.Length < 2) { p.Message("%cYou need args for botName and skinName."); return; }
+                
+                PlayerBot bot = GetBotAtName(p, args[0]);
+                if (bot != null) {
+                    SetSkin(p, bot, args[1]);
+                }
+            }
+            
+            public static void SetSkin(Player p, PlayerBot bot, string skinName) {
+                bot.SkinName = skinName;
+                
+                //       SendSpawnEntity(byte id, string name, string skin, Position pos, Orientation rot);
+                p.Session.SendSpawnEntity(bot.id, bot.DisplayName, bot.SkinName, bot.Pos, bot.Rot);
+            }
+            
+            void TryTP(Player p, string message) {
+                string[] args = message.Split(' ');
+                if (args.Length < 6) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch."); return; }
+                PlayerBot bot = GetBotAtName(p, args[0]);
+                if (bot != null) {
+                    float x = 0, y = 0, z = 0;
+                    int yaw = 0, pitch = 0;
+                    if (!CommandParser.GetReal(p, args[1], "x position", ref x)) { return; }
+                    if (!CommandParser.GetReal(p, args[2], "y position", ref y)) { return; }
+                    if (!CommandParser.GetReal(p, args[3], "z position", ref z)) { return; }
+                    if (!CommandParser.GetInt(p,  args[4], "yaw", ref yaw)) { return; }
+                    if (!CommandParser.GetInt(p,  args[5], "pitch", ref pitch)) { return; }
+                    TPBot(p, bot, x, y, z, yaw, pitch);
+                }
+            }
+            public static void TPBot(Player p, PlayerBot bot, float x, float y, float z, int yaw, int pitch) {
+                Position pos = Position.FromFeet((int)(x*32) +16, (int)(y*32), (int)(z*32) +16);
+                bot.Pos = pos;
+                
+                //looks weird if their head snaps then instantly looks at you again...
+                if (!bot.AIName.CaselessStarts("stare")) {
+                    byte byteYaw = Orientation.DegreesToPacked(yaw);
+                    byte bytePitch = Orientation.DegreesToPacked(pitch);
+                    Orientation rot = bot.Rot;
+                    rot.HeadX = bytePitch;
+                    rot.RotY = byteYaw;
+                    bot.Rot = rot;
+                }
+                
+                p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
+            }
+            
+            void TrySetAIName(Player p, string message) {
+                string[] args = message.SplitSpaces(2);
+                if (args.Length < 2) { p.Message("%cYou need args for botName and AIName"); return; }
+                PlayerBot bot = GetBotAtName(p, args[0]);
+                if (bot != null) {
+                    SetAIName(p, bot, args[1]);
+                }
+            }
+            void SetAIName(Player p, PlayerBot bot, string AIName) {
+                bot.AIName = AIName;
+            }
+            
+            static PlayerBot GetBotAtName(Player p, string botName) {
+                Tinfo list;
+                if (!tinfoFor.TryGetValue(p.name, out list) || list.botList.Count == 0)
+                {
+                    //p.Message("No tempbots currently exist.");
+                    return null;
+                }
+                foreach (PlayerBot bot in list.botList) {
+                    if (bot.name.CaselessEq(botName)) {
+                        return bot;
+                    }
+                }
+                //p.Message("No tempbots match \"{0}\".", botName);
+                return null;
+            }
+            
+            public override void Help(Player p) {
+                p.Message("%T/TempBot add [botName] [x y z] [yaw pitch] <skin> <botNick>");
+                p.Message("%H Places a client-side bot.");
+                p.Message("%T/TempBot summon [botName] [x y z] [yaw pitch]");
+                p.Message("%H Summons a client-side bot.");
+                p.Message("%T/TempBot remove [botName]");
+                p.Message("%H Removes a client-side bot.");
+                p.Message("%T/TempBot model [botName] [model name]");
+                p.Message("%H Sets model of a client-side bot.");
+                p.Message("%T/TempBot skin [botName] [skin name]");
+                p.Message("%H Sets skin of a client-side bot.");
+                p.Message("%T/TempBot ai [botName] [ai arguments]");
+                p.Message("%H Sets ai. Use %T/help tempbot ai %Hfor more info.");
+                p.Message("%T/TempBot where %H- puts your current X, Y, Z, yaw and pitch into chat for copy pasting.");
+            }
+            
+            public override void Help(Player p, string message) {
+                if (message.CaselessEq("ai")) {
+                    p.Message("%HValid AI actions for tempbots:");
+                    p.Message("%Tstare <time in tenths of a second>");
+                    p.Message("%H No time provided means stare forever.");
+                    p.Message("%Twait [time]");
+                    p.Message("%H Waits for [time in tenths of a second]");
+                    p.Message("%Tmove [X Y Z] <speed>");
+                    p.Message("%H <speed> is optional, default is 14.");
+                    p.Message("%Tanim [anim data]");
+                    p.Message("%H Get anim data from toggling &b/tbot record");
+                    p.Message("%Tsummon [X Y Z] [yaw pitch]");
+                    p.Message("%H Instantly teleports this tempbot.");
+                    p.Message("%Tmodel [modelname]");
+                    p.Message("%H Sets model.");
+                    p.Message("%Tmsg [message]");
+                    p.Message("%H You can't use commas in the message!");
+                    p.Message("%H Use ; instead and it will become ,");
+                    p.Message("%Tremove");
+                    p.Message("%H Removes this tempbot.");
+                    p.Message("%HYou can chain AI together with commas. e.g:");
+                    p.Message("%Hstare 10,wait 20,move 32 64 30");
+                    p.Message("%HPlease note the (lack of) spaces.");
+                    return;
+                }
+                Help(p);
+            }
+            
+        }
+        
+        
+        public struct KeyFrame {
+            //RotY = yaw; HeadX = pitch;
+            
+            public static KeyFrame Make(KeyFrameList list, Position pos, Orientation rot) {
+                KeyFrame the = new KeyFrame();
+                
+                
+                the.translation = new Vec3I(pos.X, pos.Y, pos.Z);
+                the.yaw = rot.RotY;
+                the.pitch = rot.HeadX;
+                
+                if (list.Count == 0) {
+                    the.useTranslation = true;
+                    the.useRotation = true;
+                    list.Add(the);
+                    return the;
+                }
+                var prev = list[list.Count-1]; //maybe this should be a stack
+                
+                the.relTranslation = the.translation - prev.translation;
+                
+                if (the.yaw == prev.yaw && the.pitch == prev.pitch) { the.useRotation = false; } else { the.useRotation = true; }
+                
+                
+                if (the.relTranslation.X == 0 && the.relTranslation.Y == 0 && the.relTranslation.Z == 0) {
+                    //no translation from previous frame
+                    list.Add(the);
+                    return the;
+                }
+                
+                
+                if (the.relTranslation.X >= sbyte.MinValue && the.relTranslation.X <= sbyte.MaxValue &&
+                    the.relTranslation.Y >= sbyte.MinValue && the.relTranslation.Y <= sbyte.MaxValue &&
+                    the.relTranslation.Z >= sbyte.MinValue && the.relTranslation.Z <= sbyte.MaxValue) {
+                        
+                    the.useRelative = true;
+                    list.Add(the);
+                    return the;
+                }
+                
+                the.useTranslation = true;
+                list.Add(the);
+                return the;
+            }
+            
+            
+            const byte TRANS_FLAG = (byte)(1 << 0);
+            const byte REL_FLAG   = (byte)(1 << 1);
+            const byte ROT_FLAG   = (byte)(1 << 2);
+            
+            public bool useTranslation;
+            public bool useRelative;
+            public bool useRotation;
+
+            
+            public Vec3I translation;
+            public Vec3I relTranslation;
+            public byte yaw, pitch;
+            
+            public void Print(Player p) {
+                //string base64 = Convert.ToBase64String(ToBytes());
+                //p.Message(base64);
+                if (useTranslation) {
+                    p.Message("&xTranslation: {0} {1} {2}", translation.X, translation.Y, translation.Z);
+                }
+                if (useRelative) {
+                    p.Message("&xRelative: {0} {1} {2}", relTranslation.X, relTranslation.Y, relTranslation.Z);
+                }
+                if (useRotation) {
+                    p.Message("&xYaw pitch: {0} {1}", yaw, pitch);
+                }
+                if (!useTranslation && !useRelative && !useRotation) {
+                    p.Message("(no change)");
+                }
+            }
+            public void PrintBytes(Player p) {
+                byte[] bytes = new byte[2 + NetUtils.StringSize];
+                bytes[0] = Network.Opcode.Message;
+                bytes[1] = (byte)CpeMessageType.Normal;
+                
+                byte[] frameBytes = ToBytes();
+                if (frameBytes.Length > NetUtils.StringSize) { p.Message("&cToo big!!"); return; }
+                
+                for (int i = 0; i < NetUtils.StringSize; i++) {
+                    if (i >= frameBytes.Length) {
+                        bytes[i+2] = (byte)' '; //pad with spaces
+                        continue;
+                    }
+                    bytes[i+2] = frameBytes[i];
+                }
+                
+                p.Send(bytes);
+                //p.Message(frameBytes[0].ToString());
+            }
+            
+            public byte[] ToBytes() {
+                List<byte> bytes = new List<byte>();
+                
+                byte transFlag = useTranslation ? TRANS_FLAG : (byte)0;
+                byte relFlag   = useRelative    ? REL_FLAG   : (byte)0;
+                byte rotFlag   = useRotation    ? ROT_FLAG   : (byte)0;
+                
+                byte flags = (byte)(transFlag | relFlag | rotFlag);
+                bytes.Add(flags);
+                
+                if (useTranslation) {
+                    bytes.AddRange(BitConverter.GetBytes(translation.X));
+                    bytes.AddRange(BitConverter.GetBytes(translation.Y));
+                    bytes.AddRange(BitConverter.GetBytes(translation.Z));
+                }
+                if (useRelative) {
+                    sbyte x = (sbyte)relTranslation.X;
+                    sbyte y = (sbyte)relTranslation.Y;
+                    sbyte z = (sbyte)relTranslation.Z;
+                    
+                    bytes.Add((byte)x);
+                    bytes.Add((byte)y);
+                    bytes.Add((byte)z);
+                }
+                if (useRotation) {
+                    bytes.Add(yaw);
+                    bytes.Add(pitch);
+                }
+                
+                return bytes.ToArray();
+            }
+            
+            public static KeyFrame FromBytes(byte[] stream, ref int pointer) {
+                KeyFrame frame = new KeyFrame();
+                
+                byte flags = stream[pointer];
+                pointer++;
+                
+                frame.useTranslation = ((flags & TRANS_FLAG) > 0) ? true : false;
+                frame.useRelative    = ((flags & REL_FLAG  ) > 0) ? true : false;
+                frame.useRotation    = ((flags & ROT_FLAG  ) > 0) ? true : false;
+                
+                if (frame.useTranslation) {
+                    frame.translation.X = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
+                    frame.translation.Y = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
+                    frame.translation.Z = BitConverter.ToInt16(stream, pointer); pointer += sizeof(int);
+                }
+                else if (frame.useRelative) {
+                    frame.relTranslation.X = (sbyte)stream[pointer]; pointer++;
+                    frame.relTranslation.Y = (sbyte)stream[pointer]; pointer++;
+                    frame.relTranslation.Z = (sbyte)stream[pointer]; pointer++;
+                }
+                if (frame.useRotation) {
+                    frame.yaw   = stream[pointer]; pointer++;
+                    frame.pitch = stream[pointer]; pointer++;
+                }
+                
+                return frame;
+            }
+        }
+        
+        public class Tinfo {
+            const CpeMessageType STOP_LINE = CpeMessageType.Status1;
+            const CpeMessageType REC_LINE = CpeMessageType.Status3;
+            
+            public Tinfo(Player p) {
+                this.p = p;
+            }
+            public Player p;
+            public List<PlayerBot> botList = new List<PlayerBot>();
+            public bool[] usedIDs = new bool[64];
+            
+            
+            public KeyFrameList keyFrames = new KeyFrameList();
+            public bool recording { get; private set; }
+            public void StartRecording() {
+                p.Message("&aStarted recording tempbot movement.");
+                p.SendCpeMessage(STOP_LINE, "&7(stop with /tbot record)");
+                p.SendCpeMessage(REC_LINE, "[&c• &fREC]      [%a||||||%8||&f]:");
+                keyFrames.Clear();
+                recording = true;
+            }
+            public void DoRecord() {
+                if (!recording) { return; }
+                
+                var frame = KeyFrame.Make(keyFrames, p.Pos, p.Rot);
+                //p.Message("ORIGINAL:");
+                //frame.Print(p);
+                
+                
+                int pointer = 0;
+                var converted = KeyFrame.FromBytes(frame.ToBytes(), ref pointer);
+                //p.Message("CONVERTED {0}:", pointer);
+                //converted.Print(p);
+                //p.Message("-");
+            }
+            public void StopRecording() {
+                p.Message("&eStopped recording tempbot movement.");
+                p.SendCpeMessage(STOP_LINE, "");
+                p.SendCpeMessage(REC_LINE, "");
+                recording = false;
+                DisplayCode();
+            }
+            void DisplayCode() {
+                List<byte> allBytes = new List<byte>();
+                foreach (var frame in keyFrames) {
+                    allBytes.AddRange(frame.ToBytes());
+                }
+                string base64 = Convert.ToBase64String(allBytes.ToArray());
+                
+                if (!Directory.Exists(directory)) { DisplayCodeToChat(base64); return; } //non na2 case
+                
+                File.WriteAllText(fullPath, base64);
+                p.Message("&eYou may find your anim data here:");
+                p.Message("&b"+url);
+                
+            }
+            void DisplayCodeToChat(string base64) {
+                string[] sections = new string[(int)Math.Ceiling(base64.Length / (float)NetUtils.StringSize)];
+                p.Message("Total length: &b{0}&S, sections: &b{1}", base64.Length, sections.Length);
+                for (int i = 0; i < sections.Length; i++) {
+                    
+                    int start = i * NetUtils.StringSize;
+                    int left = base64.Length - start;
+                    int end = Math.Min(start + (NetUtils.StringSize - 1), start + (left - 1));
+                    int length = (end - start) +1;
+                    
+                    sections[i] = base64.Substring(start, length);
+                    p.Send(Packet.Message(sections[i], CpeMessageType.Normal, p.hasCP437));
+                }
+            }
+            
+            
+            string folder    => "tbotanims/";
+            string directory => "/home/na2/Website-Files/" + folder;
+            string fileName  => p.name+".txt";
+            string fullPath  => directory + fileName;
+            string url       => "https://notawesome.cc/" + folder + fileName;
+        }
+        
+        public class CmdFlipCoin : Command2 {
+            public override string name { get { return "FlipCoin"; } }
+            
+            public override string shortcut { get { return ""; } }
+            
+            public override bool MessageBlockRestricted { get { return false; } }
+
+            public override string type { get { return "other"; } }
+            
+            public override bool museumUsable { get { return false; } }
+            
+            public override LevelPermission defaultRank { get { return LevelPermission.Guest; } }
+            public CommandData globalData;
+            public override void Use(Player p, string message, CommandData data)
+            {
+                if (data.Context != CommandContext.MessageBlock) { p.Message("You can only use this command through message blocks."); return; }
+                if (message.Length == 0) { Help(p); return; }
+                string[] bits = message.SplitSpaces(5);
+                if (bits.Length < 5) { Help(p); return; }
+                //x y z 3 stone dirt cobblestone
+                
+                int x = -1, y = -1, z = -1;
+                int amount = 1;
+                string[] models = bits[4].Split(' ');
+                
+                if (!CommandParser.GetInt(p, bits[0], "X coordinate", ref x, 0, (int)p.level.Width)) { return; }
+                if (!CommandParser.GetInt(p, bits[1], "Y coordinate", ref y, 0, (int)p.level.Height)) { return; }
+                if (!CommandParser.GetInt(p, bits[2], "Z coordinate", ref z, 0, (int)p.level.Length)) { return; }
+                int maxDice = 8;
+                if (!CommandParser.GetInt(p, bits[3], "amount", ref amount, 1, maxDice)) {
+                    return;
+                }
+                globalData.Context = CommandContext.MessageBlock;
+                globalData.Rank = LevelPermission.Nobody;
+                
+                if (MessageCmd.CanSpeak(p, name)) {
+                    Chat.MessageFromLevel(p, "<Local>λNICK %Srolls the block dice...");
+                    p.CheckForMessageSpam();
+                } else {
+                    return;
+                }
+                
+                for (int i = 0; i < maxDice; i++) {
+                    Command.Find("tempbot").Use(p, "remove flipCoinbot"+i, globalData);
+                    //p.Message("removed {0}", i);
+                }
+                //Thread.Sleep(250);
+                
+                Random seedRand = new Random();
+                int seed = seedRand.Next();
+                
+                Vec3S32 pivot = new Vec3S32(x, y, z);
+                
+                Player[] players = PlayerInfo.Online.Items;
+                foreach (Player pl in players) {
+                    if (pl.level != p.level) { continue; }
+                    Random rand = new Random(seed);
+                    //reset?
+                    models = bits[4].Split(' ');
+                    
+                    SpawnBots(pl, amount);
+                    //Thread.Sleep(250);
+                    ArrangeBots(pl, pivot, amount, models, rand);
+                    //Thread.Sleep(250);
+                    ModelBots(pl, amount, models, rand);
+                    //Thread.Sleep(500);
+                    ActivateBots(pl, amount, models, rand);
+                }
+            }
+            
+            public override void Help(Player p)
+            {
+                p.Message( "%T/FlipCoin [x y z] [amount] [model1 model2 etc...]");
+                p.Message( "%HDrops [amount] of temporary bots around [x y z] which then have a random roll based on the possible list of models given.");
+            }
+            
+            void RandomlySwapFirstElement(Random rnd, ref string[] models) {
+                if (models.Length < 1) { return; }
+                int indexForNewFront = rnd.Next(0, models.Length);
+                string oldFront = models[0];
+                
+                //swap them around with the randomly chosen index
+                models[0] = models[indexForNewFront];
+                models[indexForNewFront] = oldFront;
+            }
+            
+            void SpawnBots(Player p, int amount) {
+                for (int i = 0; i < amount; i++) {
+                    Command.Find("tempbot").Use(p, "add flipCoinbot"+i+" 0 -128 0 0 0 Goodly empty", globalData);
+                    Command.Find("tempbot").Use(p, "model flipCoinbot"+i+" 0", globalData);
+                }
+            }
+            
+            void ArrangeBots(Player p, Vec3S32 pivot, int amount, string[] models, Random rnd) {
+                Vec3S32[] botPositions = new Vec3S32[amount];
+                
+                for (int i = 0; i < amount; i++) {
+                    
+                    botPositions[i] = GetRandomPosAround(pivot, i, botPositions, rnd);
+                    string x = botPositions[i].X.ToString(),
+                    y = ( (float)(botPositions[i].Y) + (rnd.NextDouble()*4) ).ToString(),
+                    z = botPositions[i].Z.ToString();
+                    
+                    Command.Find("tempbot").Use(p, "summon flipCoinbot"+i+" "+x+" "+y+" "+z+" 0 0", globalData);
+                }
+            }
+            
+            void ModelBots(Player p, int amount, string[] models, Random rnd) {
+                for (int i = 0; i < amount; i++) {
+                    //RandomlySwapFirstElement(seed, ref models);
+                    Command.Find("tempbot").Use(p, "model flipCoinbot"+i+" "+models[rnd.Next(0, models.Length)], globalData);
+                }
+            }
+            
+            void ActivateBots(Player p, int amount, string[] models, Random rnd) {
+                for (int i = 0; i < amount; i++) {
+                    RandomlySwapFirstElement(rnd, ref models);
+                    string joined = models.Join(" ");
+                    //[dice] [velocity] [bounceTimes] [finalModel altModel1 altModel2]
+                    Command.Find("tempbot").Use(p, "ai flipCoinbot"+i+" dice 0 1 "+joined, globalData);
+                }
+            }
+            
+            Vec3S32 GetRandomPosAround(Vec3S32 pivot, int index, Vec3S32[] botPositions, Random rnd) {
+                const int extent = 2; //means a square of 5x5
+                const int height = 8;
+                //first one, any location is fine
+                if (index == 0) {
+                    return new Vec3S32(pivot.X+rnd.Next(-extent, extent+1), pivot.Y+height, pivot.Z+rnd.Next(-extent, extent+1));
+                }
+                
+                Vec3S32 pos = new Vec3S32(pivot.X+rnd.Next(-extent, extent+1), pivot.Y+height, pivot.Z+rnd.Next(-extent, extent+1));
+                while (PosMatchesBotPositionsAtIndex(pos, botPositions, index)) {
+                    pos = new Vec3S32(pivot.X+rnd.Next(-extent, extent+1), pivot.Y+height, pivot.Z+rnd.Next(-extent, extent+1));
+                }
+                return pos;
+            }
+            
+            public bool PosMatchesBotPositionsAtIndex(Vec3S32 pos, Vec3S32[] botPositions, int index) {
+                for (int i = 0; i < index; i++) {
+                    if (pos == botPositions[i]) { return true; }
+                }
+                return false;
+            }
+
+        }
+        
+        public class CmdMoveBots : Command2 {
+            public override string name { get { return "MoveBots"; } }
+            
+            public override string shortcut { get { return ""; } }
+            
+            public override bool MessageBlockRestricted { get { return true; } }
+
+            public override string type { get { return "other"; } }
+            
+            public override bool museumUsable { get { return false; } }
+            
+            public override LevelPermission defaultRank { get { return LevelPermission.Operator; } }
+            
+            static bool OwnsMap(Player p, Level lvl) {
+                if (lvl.name.CaselessStarts(p.name)) return true;
+                string[] owners = lvl.Config.RealmOwner.Replace(" ", "").Split(',');
+                
+                foreach (string owner in owners) {
+                    if (owner.CaselessEq(p.name)) return true;
+                }
+                return false;
+            }
+            
+            public override void Use(Player p, string message, CommandData data)
+            {
+                if (message.Length == 0) { Help(p); return; }
+                bool canUse = false;// = p.group.Permission >= p.level.BuildAccess.Min;
+                
+                if (OwnsMap(p, p.level) || p.group.Permission >= LevelPermission.Operator) canUse = true;
+                if (!canUse) {
+                    p.Message("&cYou can only use this command on your own maps."); return;
+                }
+                
+                string[] bits = message.SplitSpaces(5);
+                if (bits.Length < 3) { Help(p); return; }
+                //x y z 3		    
+                int x = -1, y = -1, z = -1;
+                
+                if (!CommandParser.GetInt(p, bits[0], "X delta", ref x)) { return; }
+                if (!CommandParser.GetInt(p, bits[1], "Y delta", ref y)) { return; }
+                if (!CommandParser.GetInt(p, bits[2], "Z delta", ref z)) { return; }
+                x *= 32;
+                y *= 32;
+                z *= 32;
+                
+                Position pos;
+                byte yaw, pitch;
+                PlayerBot[] bots = p.level.Bots.Items;
+                for (int i = 0; i < bots.Length; i++) {
+                    
+                    pos.X = bots[i].Pos.X + x;
+                    pos.Y = bots[i].Pos.Y + y;
+                    pos.Z = bots[i].Pos.Z + z;
+                    yaw = bots[i].Rot.RotY; pitch = bots[i].Rot.HeadX;
+                    bots[i].Pos = pos;
+                    bots[i].SetYawPitch(yaw, pitch);
+                }
+                
+                MCGalaxy.Bots.BotsFile.Save(p.level);
+                
+            }
+            
+            public override void Help(Player p)
+            {
+                p.Message( "%T/MoveBots [x y z]");
+                p.Message( "%HMoves all the bots in the map you're in by [x y z].");
+                p.Message( "%HFor example, 0 1 0 would move all the bots up by 1 block.");
+            }
+
+        }
+	
 		
     }
     
-	public class CmdFlipCoin : Command2
-	{
-		public override string name { get { return "FlipCoin"; } }
-		
-		public override string shortcut { get { return ""; } }
-		
-		public override bool MessageBlockRestricted { get { return false; } }
 
-		public override string type { get { return "other"; } }
-		
-		public override bool museumUsable { get { return false; } }
-		
-		public override LevelPermission defaultRank { get { return LevelPermission.Guest; } }
-		public CommandData globalData;
-		public override void Use(Player p, string message, CommandData data)
-		{
-		    if (data.Context != CommandContext.MessageBlock) { p.Message("You can only use this command through message blocks."); return; }
-		    if (message.Length == 0) { Help(p); return; }
-		    string[] bits = message.SplitSpaces(5);
-		    if (bits.Length < 5) { Help(p); return; }
-		    //x y z 3 stone dirt cobblestone
-		    
-		    int x = -1, y = -1, z = -1;
-		    int amount = 1;
-		    string[] models = bits[4].Split(' ');
-		    
-		    if (!CommandParser.GetInt(p, bits[0], "X coordinate", ref x, 0, (int)p.level.Width)) { return; }
-		    if (!CommandParser.GetInt(p, bits[1], "Y coordinate", ref y, 0, (int)p.level.Height)) { return; }
-		    if (!CommandParser.GetInt(p, bits[2], "Z coordinate", ref z, 0, (int)p.level.Length)) { return; }
-		    int maxDice = 8;
-		    if (!CommandParser.GetInt(p, bits[3], "amount", ref amount, 1, maxDice)) {
-		        return;
-		    }
-		    globalData.Context = CommandContext.MessageBlock;
-		    globalData.Rank = LevelPermission.Nobody;
-		    
-		    if (MessageCmd.CanSpeak(p, name)) {
-		        Chat.MessageFromLevel(p, "<Local>λNICK %Srolls the block dice...");
-		        p.CheckForMessageSpam();
-		    } else {
-		        return;
-		    }
-		    
-		    for (int i = 0; i < maxDice; i++) {
-		        Command.Find("tempbot").Use(p, "remove flipCoinbot"+i, globalData);
-		        //p.Message("removed {0}", i);
-		    }
-		    //Thread.Sleep(250);
-		    
-		    Random seedRand = new Random();
-		    int seed = seedRand.Next();
-		    
-		    Vec3S32 pivot = new Vec3S32(x, y, z);
-		    
-		    Player[] players = PlayerInfo.Online.Items;
-			foreach (Player pl in players) {
-		        if (pl.level != p.level) { continue; }
-		        Random rand = new Random(seed);
-		        //reset?
-		        models = bits[4].Split(' ');
-		        
-    			SpawnBots(pl, amount);
-    			//Thread.Sleep(250);
-    			ArrangeBots(pl, pivot, amount, models, rand);
-    			//Thread.Sleep(250);
-    			ModelBots(pl, amount, models, rand);
-    			//Thread.Sleep(500);
-    			ActivateBots(pl, amount, models, rand);
-		    }
-		}
-		
-		public override void Help(Player p)
-		{
-            p.Message( "%T/FlipCoin [x y z] [amount] [model1 model2 etc...]");
-            p.Message( "%HDrops [amount] of temporary bots around [x y z] which then have a random roll based on the possible list of models given.");
-		}
-		
-		void RandomlySwapFirstElement(Random rnd, ref string[] models) {
-		    if (models.Length < 1) { return; }
-		    int indexForNewFront = rnd.Next(0, models.Length);
-		    string oldFront = models[0];
-		    
-		    //swap them around with the randomly chosen index
-		    models[0] = models[indexForNewFront];
-		    models[indexForNewFront] = oldFront;
-		}
-		
-		void SpawnBots(Player p, int amount) {
-			for (int i = 0; i < amount; i++) {
-			    Command.Find("tempbot").Use(p, "add flipCoinbot"+i+" 0 -128 0 0 0 Goodly empty", globalData);
-			    Command.Find("tempbot").Use(p, "model flipCoinbot"+i+" 0", globalData);
-			}
-		}
-		
-		void ArrangeBots(Player p, Vec3S32 pivot, int amount, string[] models, Random rnd) {
-		    Vec3S32[] botPositions = new Vec3S32[amount];
-		    
-			for (int i = 0; i < amount; i++) {
-		        
-		        botPositions[i] = GetRandomPosAround(pivot, i, botPositions, rnd);
-		        string x = botPositions[i].X.ToString(),
-		        y = ( (float)(botPositions[i].Y) + (rnd.NextDouble()*4) ).ToString(),
-		        z = botPositions[i].Z.ToString();
-		        
-			    Command.Find("tempbot").Use(p, "summon flipCoinbot"+i+" "+x+" "+y+" "+z+" 0 0", globalData);
-			}
-		}
-		
-		void ModelBots(Player p, int amount, string[] models, Random rnd) {
-		    for (int i = 0; i < amount; i++) {
-			    //RandomlySwapFirstElement(seed, ref models);
-			    Command.Find("tempbot").Use(p, "model flipCoinbot"+i+" "+models[rnd.Next(0, models.Length)], globalData);
-		    }
-		}
-		
-		void ActivateBots(Player p, int amount, string[] models, Random rnd) {
-			for (int i = 0; i < amount; i++) {
-			    RandomlySwapFirstElement(rnd, ref models);
-			    string joined = models.Join(" ");
-			    //[dice] [velocity] [bounceTimes] [finalModel altModel1 altModel2]
-			    Command.Find("tempbot").Use(p, "ai flipCoinbot"+i+" dice 0 1 "+joined, globalData);
-			}
-		}
-		
-		Vec3S32 GetRandomPosAround(Vec3S32 pivot, int index, Vec3S32[] botPositions, Random rnd) {
-		    const int extent = 2; //means a square of 5x5
-		    const int height = 8;
-		    //first one, any location is fine
-		    if (index == 0) {
-		        return new Vec3S32(pivot.X+rnd.Next(-extent, extent+1), pivot.Y+height, pivot.Z+rnd.Next(-extent, extent+1));
-		    }
-		    
-		    Vec3S32 pos = new Vec3S32(pivot.X+rnd.Next(-extent, extent+1), pivot.Y+height, pivot.Z+rnd.Next(-extent, extent+1));
-		    while (PosMatchesBotPositionsAtIndex(pos, botPositions, index)) {
-		        pos = new Vec3S32(pivot.X+rnd.Next(-extent, extent+1), pivot.Y+height, pivot.Z+rnd.Next(-extent, extent+1));
-		    }
-		    return pos;
-		}
-		
-		public bool PosMatchesBotPositionsAtIndex(Vec3S32 pos, Vec3S32[] botPositions, int index) {
-		    for (int i = 0; i < index; i++) {
-		        if (pos == botPositions[i]) { return true; }
-		    }
-		    return false;
-		}
-
-	}
-	
-	public class CmdMoveBots : Command2
-	{
-		public override string name { get { return "MoveBots"; } }
-		
-		public override string shortcut { get { return ""; } }
-		
-		public override bool MessageBlockRestricted { get { return true; } }
-
-		public override string type { get { return "other"; } }
-		
-		public override bool museumUsable { get { return false; } }
-		
-		public override LevelPermission defaultRank { get { return LevelPermission.Operator; } }
-		
-		static bool OwnsMap(Player p, Level lvl) {
-			if (lvl.name.CaselessStarts(p.name)) return true;
-			string[] owners = lvl.Config.RealmOwner.Replace(" ", "").Split(',');
-			
-			foreach (string owner in owners) {
-				if (owner.CaselessEq(p.name)) return true;
-			}
-			return false;
-		}
-		
-		public override void Use(Player p, string message, CommandData data)
-		{
-		    if (message.Length == 0) { Help(p); return; }
-			bool canUse = false;// = p.group.Permission >= p.level.BuildAccess.Min;
-			
-			if (OwnsMap(p, p.level) || p.group.Permission >= LevelPermission.Operator) canUse = true;
-			if (!canUse) {
-				p.Message("&cYou can only use this command on your own maps."); return;
-			}
-			
-		    string[] bits = message.SplitSpaces(5);
-		    if (bits.Length < 3) { Help(p); return; }
-		    //x y z 3		    
-		    int x = -1, y = -1, z = -1;
-		    
-		    if (!CommandParser.GetInt(p, bits[0], "X delta", ref x)) { return; }
-		    if (!CommandParser.GetInt(p, bits[1], "Y delta", ref y)) { return; }
-		    if (!CommandParser.GetInt(p, bits[2], "Z delta", ref z)) { return; }
-		    x *= 32;
-		    y *= 32;
-		    z *= 32;
-		    
-		    Position pos;
-		    byte yaw, pitch;
-            PlayerBot[] bots = p.level.Bots.Items;
-            for (int i = 0; i < bots.Length; i++) {
-                
-                pos.X = bots[i].Pos.X + x;
-                pos.Y = bots[i].Pos.Y + y;
-                pos.Z = bots[i].Pos.Z + z;
-                yaw = bots[i].Rot.RotY; pitch = bots[i].Rot.HeadX;
-                bots[i].Pos = pos;
-                bots[i].SetYawPitch(yaw, pitch);
-            }
-            
-            MCGalaxy.Bots.BotsFile.Save(p.level);
-		    
-		}
-		
-		public override void Help(Player p)
-		{
-            p.Message( "%T/MoveBots [x y z]");
-            p.Message( "%HMoves all the bots in the map you're in by [x y z].");
-            p.Message( "%HFor example, 0 1 0 would move all the bots up by 1 block.");
-		}
-
-	}
-	
     
 }
