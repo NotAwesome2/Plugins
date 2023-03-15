@@ -1051,11 +1051,11 @@ namespace MCGalaxy {
             }
             
             
-            string folder    => "tbotanims/";
-            string directory => "/home/na2/Website-Files/" + folder;
-            string fileName  => p.name+".txt";
-            string fullPath  => directory + fileName;
-            string url       => "https://notawesome.cc/" + folder + fileName;
+            string folder    { get { return "tbotanims/"; } }
+            string directory { get { return "/home/na2/Website-Files/" + folder; } }
+            string fileName  { get { return p.name+".txt"; } }
+            string fullPath  { get { return directory + fileName; } }
+            string url       { get { return "https://notawesome.cc/" + folder + fileName; } }
         }
         
         public class CmdFlipCoin : Command2 {
@@ -1276,9 +1276,5 @@ namespace MCGalaxy {
 
         }
 	
-		
     }
-    
-
-    
 }
