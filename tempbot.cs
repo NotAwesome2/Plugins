@@ -128,7 +128,9 @@ namespace MCGalaxy {
                 return;
             }
             
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             
             if (bot.AIName.StartsWith(" ")) {
                 p.Message("%cUnrecognized bot ai \"%S{0}%c\". Did you accidentally put a space after a comma separator?", instruction);
@@ -151,7 +153,9 @@ namespace MCGalaxy {
         }
         
         static void DoRunScript(Player p, PlayerBot bot) {
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             
             string[] bits = instruction.SplitSpaces(2);
             string runscriptArgs = "DEFAULT ARGS";
@@ -166,7 +170,9 @@ namespace MCGalaxy {
         }
         
         static void DoMessage(Player p, PlayerBot bot) {
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             
             string[] bits = instruction.SplitSpaces(2);
             string message = "DEFAULT TEMPBOT MESSAGE";
@@ -181,7 +187,9 @@ namespace MCGalaxy {
         }
         
         static void DoTP(Player p, PlayerBot bot) {
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             
             float x = 0, y = 0, z = 0;
             int yaw = 0, pitch = 0;
@@ -217,7 +225,9 @@ namespace MCGalaxy {
         }
         
         static void DoAnim(Player p, PlayerBot bot) {
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             
             string[] bits = instruction.SplitSpaces(2);
             string instructionName = bits[0];
@@ -265,7 +275,9 @@ namespace MCGalaxy {
         }
         
         static void DoDiceFall(Player p, PlayerBot bot) {
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             //dice velocity finalModel altModel1 altModel2 [...]
             
             //[dice] [velocity] [bounceTimes] [finalModel altModel1 altModel2]
@@ -334,7 +346,9 @@ namespace MCGalaxy {
         }
         
         static void DoModel(Player p, PlayerBot bot) {
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             
             
             string[] bits = instruction.Split(' ');
@@ -351,7 +365,9 @@ namespace MCGalaxy {
         }
         
         static void DoStare(Player p, PlayerBot bot) {
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             
             string[] bits = instruction.Split(' ');
             if (bits.Length > 1) {
@@ -374,7 +390,9 @@ namespace MCGalaxy {
         }
         
         static void DoWait(Player p, PlayerBot bot) {
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             
             string[] bits = instruction.Split(' ');
             if (bits.Length > 1) {
@@ -397,7 +415,9 @@ namespace MCGalaxy {
         }
         
         static void DoMove(Player p, PlayerBot bot) {
-            ParseInstructions(bot.AIName, out string instruction, out string trailingInstructions);
+            string instruction;
+            string trailingInstructions;
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             
             Position goal = bot.Pos;
             float speed = 14;
