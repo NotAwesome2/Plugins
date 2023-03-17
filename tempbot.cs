@@ -1045,12 +1045,42 @@ namespace MCGalaxy {
             public bool[] usedIDs = new bool[64];
             
             
+            static string Battery(float percent) {
+                int maxHealth = 6;
+                int health = (int)(maxHealth * percent);
+                if (health < maxHealth) { health++; }
+                
+                string healthColor = "&a";
+                if (percent <= 0.25f) { healthColor = "&c"; }
+                else if (percent <= 0.5f) { healthColor = "&e"; }
+                
+                var builder = new System.Text.StringBuilder(healthColor, maxHealth + 4);
+                
+                string final;
+                for (int i = 1; i < health + 1; ++i) {
+                    builder.Append("|");
+                }
+                if (health >= maxHealth) {
+                    final = builder.ToString();
+                    return final;
+                }
+
+                int lostHealth = maxHealth - health;
+
+                builder.Append("&8");
+                for (int i = 1; i < lostHealth + 1; ++i) {
+                    builder.Append("|");
+                }
+                final = builder.ToString();
+                return final;
+            }
+            
             public KeyFrameList keyFrames = new KeyFrameList();
             public bool recording { get; private set; }
+            int maxFrames = 60 * 10;
             public void StartRecording() {
                 p.Message("&aStarted recording tempbot movement.");
                 p.SendCpeMessage(STOP_LINE, "&7(stop with /tbot record)");
-                p.SendCpeMessage(REC_LINE, "[&c• &fREC]      [%a||||||%8||&f]:");
                 keyFrames.Clear();
                 recording = true;
             }
@@ -1058,6 +1088,17 @@ namespace MCGalaxy {
                 if (!recording) { return; }
                 
                 var frame = KeyFrame.Make(keyFrames, p.Pos, p.Rot, p.Model);
+                
+                float percent = 1 - (keyFrames.Count / (float)maxFrames);
+                if (percent <= 0) { StopRecording(); return; }
+                
+                string battery = "["+Battery(percent)+"&f]:";
+                if (keyFrames.Count % 10 < 5) {
+                    p.SendCpeMessage(REC_LINE, "&c• &fREC   "+battery);
+                } else {
+                    p.SendCpeMessage(REC_LINE, "&fREC   "+battery);
+                }
+                
                 
                 //p.Message("ORIGINAL:");
                 //frame.Print(p);
