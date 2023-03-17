@@ -1037,6 +1037,8 @@ namespace MCGalaxy {
             
             public Tinfo(Player p) {
                 this.p = p;
+                //This is required for CustomModels plugin to work correctly with tempbots. Do not remove.
+                p.Extras["TempBot_BotList"] = botList;
             }
             public Player p;
             public List<PlayerBot> botList = new List<PlayerBot>();
@@ -1073,9 +1075,6 @@ namespace MCGalaxy {
                 p.SendCpeMessage(STOP_LINE, "");
                 p.SendCpeMessage(REC_LINE, "");
                 recording = false;
-                //foreach (var frame in keyFrames) {
-                //    frame.Print(p);
-                //}
                 DisplayCode();
             }
             void DisplayCode() {
