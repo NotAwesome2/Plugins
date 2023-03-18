@@ -24,41 +24,41 @@ using KeyFrameList = System.Collections.Generic.List<MCGalaxy.PluginTempBot.KeyF
 
 namespace MCGalaxy {
     
-	public sealed class PluginTempBot : Plugin {
-		public override string name { get { return "tempbot"; } }
-		public override string MCGalaxy_Version { get { return "1.9.4.7"; } }
-		public override string creator { get { return "goodly"; } }
-		
+    public sealed class PluginTempBot : Plugin {
+        public override string name { get { return "tempbot"; } }
+        public override string MCGalaxy_Version { get { return "1.9.4.7"; } }
+        public override string creator { get { return "goodly"; } }
+        
         public delegate void DoAI(Player p, PlayerBot bot);
         static Dictionary<string, DoAI> AIDict = new Dictionary<string, DoAI>();
         
-		public const byte botIDstartValue = 128;
-		public static Dictionary<string, Tinfo> tinfoFor = new Dictionary<string, Tinfo>();
-		
-		public static byte NextFreeID(Player p) {
-		    for (int i = 0; i < tinfoFor[p.name].usedIDs.Length; i++) {
-		        if (!tinfoFor[p.name].usedIDs[i]) {
-		            return (byte)(i + botIDstartValue);
-		        }
-		    }
-		    return 0;
-		}
-		
-		Command tempbotCmd;
-		Command flipcoinCmd;
-		Command moveBotsCmd;
-		public override void Load(bool startup) {
-			
-			tempbotCmd = new CmdTempBot();
-			flipcoinCmd = new CmdFlipCoin();
-			moveBotsCmd = new CmdMoveBots();
-			Command.Register(tempbotCmd);
-			Command.Register(flipcoinCmd);
-			Command.Register(moveBotsCmd);
-			
-			OnPlayerDisconnectEvent.Register(HandleDisconnect, Priority.High);
-			OnSentMapEvent.Register(HandleSentMap, Priority.High);
-			
+        public const byte botIDstartValue = 128;
+        public static Dictionary<string, Tinfo> tinfoFor = new Dictionary<string, Tinfo>();
+        
+        public static byte NextFreeID(Player p) {
+            for (int i = 0; i < tinfoFor[p.name].usedIDs.Length; i++) {
+                if (!tinfoFor[p.name].usedIDs[i]) {
+                    return (byte)(i + botIDstartValue);
+                }
+            }
+            return 0;
+        }
+        
+        Command tempbotCmd;
+        Command flipcoinCmd;
+        Command moveBotsCmd;
+        public override void Load(bool startup) {
+            
+            tempbotCmd = new CmdTempBot();
+            flipcoinCmd = new CmdFlipCoin();
+            moveBotsCmd = new CmdMoveBots();
+            Command.Register(tempbotCmd);
+            Command.Register(flipcoinCmd);
+            Command.Register(moveBotsCmd);
+            
+            OnPlayerDisconnectEvent.Register(HandleDisconnect, Priority.High);
+            OnSentMapEvent.Register(HandleSentMap, Priority.High);
+            
             AIDict["dice"] = DoDiceFall;
             AIDict["stare"] = DoStare;
             AIDict["wait"] = DoWait;
@@ -71,30 +71,30 @@ namespace MCGalaxy {
             AIDict["msg"] = DoMessage;
             AIDict["runscript"] = DoRunScript;
             
-			Activate();
-		}
-		
-		public override void Unload(bool shutdown) {
-		    Command.Unregister(tempbotCmd);
-		    Command.Unregister(flipcoinCmd);
-		    Command.Unregister(moveBotsCmd);
-			
-			OnPlayerDisconnectEvent.Unregister(HandleDisconnect);
-			OnSentMapEvent.Unregister(HandleSentMap);
-			
-			tinfoFor.Clear();
-			
-			instance.Cancel(tickBots);
-		}
-		
-		static void HandleDisconnect(Player p, string reason) {
-			tinfoFor.Remove(p.name);
-			
-		}
-		static void HandleSentMap(Player p, Level prevLevel, Level level) {
-			tinfoFor.Remove(p.name);
-		}
-		
+            Activate();
+        }
+        
+        public override void Unload(bool shutdown) {
+            Command.Unregister(tempbotCmd);
+            Command.Unregister(flipcoinCmd);
+            Command.Unregister(moveBotsCmd);
+            
+            OnPlayerDisconnectEvent.Unregister(HandleDisconnect);
+            OnSentMapEvent.Unregister(HandleSentMap);
+            
+            tinfoFor.Clear();
+            
+            instance.Cancel(tickBots);
+        }
+        
+        static void HandleDisconnect(Player p, string reason) {
+            tinfoFor.Remove(p.name);
+            
+        }
+        static void HandleSentMap(Player p, Level prevLevel, Level level) {
+            tinfoFor.Remove(p.name);
+        }
+        
         static Scheduler instance;
         static SchedulerTask tickBots;
         public static void Activate() {
@@ -546,7 +546,7 @@ namespace MCGalaxy {
             public override bool museumUsable { get { return false; } }
             public override LevelPermission defaultRank { get { return LevelPermission.Operator; } }
             
-            public override void Use(Player p, string message, CommandData data) {		
+            public override void Use(Player p, string message, CommandData data) {      
                 if (message.CaselessEq("where")) { DoWhere(p); return; }
                 if (!CanUse(p, data)) { return; }
                 
@@ -1337,7 +1337,7 @@ namespace MCGalaxy {
                 
                 string[] bits = message.SplitSpaces(5);
                 if (bits.Length < 3) { Help(p); return; }
-                //x y z 3		    
+                //x y z 3           
                 int x = -1, y = -1, z = -1;
                 
                 if (!CommandParser.GetInt(p, bits[0], "X delta", ref x)) { return; }
@@ -1372,6 +1372,6 @@ namespace MCGalaxy {
             }
 
         }
-	
+    
     }
 }
