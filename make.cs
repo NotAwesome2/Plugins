@@ -5,6 +5,7 @@ using System.Linq;
 using MCGalaxy;
 using MCGalaxy.Commands;
 using MCGalaxy.DB;
+using MCGalaxy.Blocks;
 using System.Collections.Generic;
 using System.IO;
 
@@ -56,7 +57,7 @@ namespace NA2 {
         }
         
         static string GetBlockName(Player p, BlockID blockID) {
-            blockID = Block.FromRaw(blockID);
+            blockID = Block.FromRaw(blockID); //convert from clientside to server side ID
             
             if (Block.IsPhysicsType(blockID)) return "Physics block";
             
@@ -65,6 +66,7 @@ namespace NA2 {
                 def = p.level.GetBlockDef(blockID);
             } else {
                 def = BlockDefinition.GlobalDefs[blockID];
+                if (def == null && blockID > 0 && blockID < Block.CPE_COUNT) { def = DefaultSet.MakeCustomBlock(blockID); }
             }
             if (def != null) { return def.Name; }
             
