@@ -74,7 +74,7 @@ namespace NA2 {
         protected abstract bool CanUse(Player p);
         protected abstract Command BlockDefCommand { get; }
         protected abstract int Dir { get; }
-        protected abstract BlockID DefaultRequestedSlot { get; }
+        protected abstract int DefaultRequestedSlot { get; }
         protected abstract BlockID IterateTo { get; }
         protected abstract BlockDefinition[] GetBlockDefs(Player p);
         protected abstract string BlockPropsScope { get; }
@@ -98,7 +98,7 @@ namespace NA2 {
             
             string name = GetBlockName(p, (BlockID)sourceID);
             int requestedSlot = DefaultRequestedSlot;
-            if (requestedSlot == Block.Invalid) {
+            if (requestedSlot == -1) {
                 p.Message("&WThere are no unused custom block ids left.");
                 return;
             }
@@ -106,8 +106,8 @@ namespace NA2 {
                 if (!CommandParser.GetInt(p, args[2], "starting ID", ref requestedSlot, Block.CPE_COUNT, Block.MaxRaw)) { return; } 
             }
             
-            p.Message("requested slot is {0}", requestedSlot);
-            p.Message("IterateTo: {0}", IterateTo);
+            //p.Message("requested slot is {0}", requestedSlot);
+            //p.Message("IterateTo: {0}", IterateTo);
             
             if (makeActions.ContainsKey(type)) {
                 lock (locker) {
@@ -485,7 +485,7 @@ namespace NA2 {
         }
         protected override Command BlockDefCommand { get { return Command.Find("levelblock"); } }
         protected override int Dir { get { return -1; } }
-        protected override BlockID DefaultRequestedSlot { get { return Block.MaxRaw; } }
+        protected override int DefaultRequestedSlot { get { return Block.MaxRaw; } }
         protected override BlockID IterateTo { get { return Block.CPE_COUNT; } }
         protected override BlockDefinition[] GetBlockDefs(Player p) {
             return p.level.CustomBlockDefs;
@@ -504,14 +504,14 @@ namespace NA2 {
         protected override bool CanUse(Player p) { return true; }
         protected override Command BlockDefCommand { get { return Command.Find("globalblock"); } }
         protected override int Dir { get { return 1; } }
-        protected override BlockID DefaultRequestedSlot {
+        protected override int DefaultRequestedSlot {
             get {
                 BlockDefinition[] defs = BlockDefinition.GlobalDefs;
                 for (BlockID b = Block.CPE_COUNT; b <= Block.MaxRaw; b++) {
                     BlockID block = Block.FromRaw(b);
                     if (defs[block] == null) return b;
                 }
-                return Block.Invalid;
+                return -1;
             }
         }
         protected override BlockID IterateTo { get { return Block.MaxRaw; } }
