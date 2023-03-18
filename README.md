@@ -12,8 +12,13 @@ This plugin makes it so that only players who have permission to build in the ma
 ## grc.cs
 This plugin adds /GotoRandomCool, which is like /gotorandom, but based on a curated list. The list can be managed with the /grc command.
 
+## make.cs
+This plugins adds /make and /makeGB, which allows you to quickly create shapes such as slabs, walls, and stairs, for the level you're in or the entire server.
+
+Use `/help make` or `/help makegb` for more information.
+
 ## orderblocks.cs
-This plugin makes ordering the block menu much easier. See /help orderblocks for usage. The top left of the inventory matches with 0, 0, 0 in the blockorder world. All blocks should have 1 block of air between them.
+This plugin makes ordering the block menu much easier. See `/help orderblocks` for usage. The top left of the inventory matches with 0, 0, 0 in the blockorder world. All blocks should have 1 block of air between them.
 
 ## tempbot.cs
 This plugin is complimentary to [Not-Awesome-Script](https://github.com/NotAwesome2/Not-Awesome-Script). It allows you to create clientside instances of bots to manipulate with scripted movements. See /help tempbot for more details.
