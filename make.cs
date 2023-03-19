@@ -48,12 +48,7 @@ namespace NA2 {
             makeActions["eighths"] = MakeEighths;
             makeActions["panes"] = MakePanes;
             
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            foreach (KeyValuePair<string, MakeType> pair in makeActions) {
-                sb.Append(pair.Key + ", ");
-            }
-            sb.Remove(sb.Length-2, 2); //remove last comma and space
-            TYPES = sb.ToString();
+            TYPES = string.Join(", ", makeActions.Keys);
         }
         
         static string GetBlockName(Player p, BlockID blockID) {
@@ -66,8 +61,13 @@ namespace NA2 {
                 def = p.level.GetBlockDef(blockID);
             } else {
                 def = BlockDefinition.GlobalDefs[blockID];
-                if (def == null && blockID > 0 && blockID < Block.CPE_COUNT) { def = DefaultSet.MakeCustomBlock(blockID); }
             }
+            if (def == null && blockID > 0 && blockID < Block.CPE_COUNT) {
+                p.Message("Making default");
+                def = DefaultSet.MakeCustomBlock(blockID);
+                p.Message("def.Name is {0}", def.Name);
+            }
+            
             if (def != null) { return def.Name; }
             
             return "Unknown";
