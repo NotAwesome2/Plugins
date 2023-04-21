@@ -1,6 +1,13 @@
 # Plugins
 Plugins written for Not Awesome 2
 
+### How do add them to my server?
+- Place the .cs file in */plugins* folder.
+- Use `/pcompile [plugin name]`
+- Use `/pload [plugin name]`
+
+You only need to do this once. It will load automatically in the future.
+
 ## writefont.cs
 This plugin was originally (and graciously) written by UnknownShadow200 for Not Awesome 2.
 In order for it to function, you must create the folder "extra/fonts" and place a font .png file inside. These font files are arranged like the ones that the client texture pack uses.
