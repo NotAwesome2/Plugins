@@ -8,6 +8,8 @@ Plugins written for Not Awesome 2
 
 You only need to do this once. It will load automatically in the future.
 
+If you want to stop using the plugin, use `/punload [plugin name]`, then delete the plugin.dll file.
+
 ## writefont.cs
 This plugin was originally (and graciously) written by UnknownShadow200 for Not Awesome 2.
 In order for it to function, you must create the folder "extra/fonts" and place a font .png file inside. These font files are arranged like the ones that the client texture pack uses.
