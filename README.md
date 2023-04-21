@@ -2,7 +2,7 @@
 Plugins written for Not Awesome 2
 
 ### How do add them to my server?
-- Place the .cs file in */plugins* folder.
+- Place the .cs file in *plugins* folder.
 - Use `/pcompile [plugin name]`
 - Use `/pload [plugin name]`
 
