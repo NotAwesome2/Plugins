@@ -47,6 +47,7 @@ namespace NA2 {
             makeActions["corners"] = MakeCorners;
             makeActions["eighths"] = MakeEighths;
             makeActions["panes"] = MakePanes;
+            makeActions["poles"] = MakePoles;
             
             TYPES = string.Join(", ", makeActions.Keys);
         }
@@ -460,7 +461,31 @@ namespace NA2 {
             maker.defCmd.Use(p, "edit " + dest + " max 16 "+height+" 8");
             maker.defCmd.Use(p, "edit " + dest + " blockslight 0");
         }
-        
+        static void MakePoles(CmdMakeBase maker, Player p, int origin, string name, BlockID requestedSlot) {
+            int dest;
+            if (!maker.AreEnoughBlockIDsFree(p, 3, out dest, requestedSlot)) { return; }
+            
+            //UD
+            maker.defCmd.Use(p, "copy " + origin + " " + dest);
+            maker.defCmd.Use(p, "edit " + dest + " name " + name + " Pole-UD");
+            maker.defCmd.Use(p, "edit " + dest + " min 4 0 4");
+            maker.defCmd.Use(p, "edit " + dest + " max 12 16 12");
+            maker.defCmd.Use(p, "edit " + dest + " blockslight 0");
+            dest += maker.Dir;
+            //NS
+            maker.defCmd.Use(p, "copy " + origin + " " + dest);
+            maker.defCmd.Use(p, "edit " + dest + " name " + name + " Pole-NS");
+            maker.defCmd.Use(p, "edit " + dest + " min 4 4 0");
+            maker.defCmd.Use(p, "edit " + dest + " max 12 12 16");
+            maker.defCmd.Use(p, "edit " + dest + " blockslight 0");
+            dest += maker.Dir;
+            //WE
+            maker.defCmd.Use(p, "copy " + origin + " " + dest);
+            maker.defCmd.Use(p, "edit " + dest + " name " + name + " Pole-WE");
+            maker.defCmd.Use(p, "edit " + dest + " min 0 4 4");
+            maker.defCmd.Use(p, "edit " + dest + " max 16 12 12");
+            maker.defCmd.Use(p, "edit " + dest + " blockslight 0");
+        }
         
         public override void Help(Player p) {
             p.Message("%T/{0} [type] [block] <optional starting ID>", name);
