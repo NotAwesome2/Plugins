@@ -133,6 +133,8 @@ namespace ExtraLevelProps
         
         const string propsAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._";
         const string propsSplitter = " = ";
+        static string[] propsSplitterSeperators = new string[] { propsSplitter };
+        
     	internal static bool IsValidProp(string name) {
             if (name.Length > 0 && name.ContainsAllIn(propsAlphabet)) return true;
             return false;
@@ -193,7 +195,7 @@ namespace ExtraLevelProps
                 ExtrasCollection col = new ExtrasCollection();
                 
                 foreach (string line in lines) {
-                    string[] bits = line.Split(propsSplitter, 2, StringSplitOptions.RemoveEmptyEntries);
+                    string[] bits = line.Split(propsSplitterSeperators, 2, StringSplitOptions.RemoveEmptyEntries);
                     if (bits.Length != 2) { continue; } //malformed key value pair
                     if (!(IsValidProp(bits[0]) && IsValidProp(bits[1]))) { continue; } //key value pair contains illegal characters
                     col[bits[0]] = bits[1];
