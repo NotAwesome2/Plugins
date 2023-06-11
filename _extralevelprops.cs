@@ -193,7 +193,7 @@ namespace ExtraLevelProps
                 ExtrasCollection col = new ExtrasCollection();
                 
                 foreach (string line in lines) {
-                    string[] bits = line.Split(propsSplitter);
+                    string[] bits = line.Split(propsSplitter, 2, StringSplitOptions.RemoveEmptyEntries);
                     if (bits.Length != 2) { continue; } //malformed key value pair
                     if (!(IsValidProp(bits[0]) && IsValidProp(bits[1]))) { continue; } //key value pair contains illegal characters
                     col[bits[0]] = bits[1];
