@@ -28,21 +28,24 @@ bool hasScriptProp = p.level.HasExtraProp("script");
 ```CS
 public static string GetExtraPropString(this Level level, string key, string defaultValue = "")
 
-//Example usage: which script this level should run by default if no script is provided. Default to level name if no "script" property has been set.
+//Example usage: which script this level should run by default if no script is provided.
+//Default to level name if no "script" property has been set.
 string currentLevelScriptName = p.level.GetExtraPropString("script", p.level.name);
 ```
 
 ```CS
 public static bool GetExtraPropBool(this Level level, string key)
 
-//Example usage: is this a minigame level or not? Defaults to false if no "minigame" property has been set or the property could not be parsed as a bool.
+//Example usage: is this a minigame level or not?
+//Defaults to false if no "minigame" property has been set or the property could not be parsed as a bool.
 bool minigameLevel = p.level.GetExtraPropBool("minigame");
 ```
 
 ```CS
 public static int GetExtraPropInt(this Level level, string key)
 
-//Example usage: how many lives does the player start with in this map? Defaults to 0 if no "max_lives" property has been set or the property could not be parsed as an int.
+//Example usage: how many lives does the player start with in this map?
+//Defaults to 0 if no "max_lives" property has been set or the property could not be parsed as an int.
 int maxLives = p.level.GetExtraPropInt("max_lives");
 ```
 
