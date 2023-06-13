@@ -52,12 +52,11 @@ int maxLives = p.level.GetExtraPropInt("max_lives");
 ```CS
 public static void SetExtraProp(this Level level, string key, string value)
 //Set level properties through plugin code if you do not want to use or allow the use of /mapext
+//This method will throw a System.ArgumentException if you pass a key or value with characters that are not included in
+//the allowed character set: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._
 
 //Example usage: set the script this level should run by default if no script is provided.
 p.level.SetExtraProp("script", "common_actions");
-
-//This method will throw a System.ArgumentException if you pass a key or value with characters that are not included in
-//the allowed character set: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._
 ```
 
 ```CS
