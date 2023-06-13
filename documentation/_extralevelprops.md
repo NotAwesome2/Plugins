@@ -59,3 +59,27 @@ p.level.SetExtraProp("script", "common_actions");
 //This method will throw a System.ArgumentException if you pass a key or value with characters that are not included in
 //the allowed character set: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._
 ```
+
+```CS
+public static List<KeyValuePair<string, string>> AllExtraProps(this Level level)
+//Get all of the extra properties of this level.
+//Returns a list of KeyValuePairs from the level where .Key is the property name and .Value is the property value.
+//If this level has never had any extra properties set, this method will return null.
+//If this level has had extra properties set since it was loaded that have since been removed, this method will return an empty List.
+//This collection is cached. It will not update if the level properties change after you retrieve it and
+//editing values in this collection will not result in the level properties being edited.
+
+//Example usage: display all of the current extra level props.
+var kvps = p.level.AllExtraProps();
+bool none = (kvps == null || kvps.Count == 0);
+if (none) { p.Message("  no extra settings have been specified."); return; }
+
+p.Message("&TExtra map settings:");
+//sort alphabetically for aesthetics (you need using System.Linq; for this):
+kvps.Sort((name1, name2) => string.Compare(name1.Key, name2.Key));
+
+foreach (var kvp in kvps) {
+    p.Message("  &6{0}&S: {1}", kvp.Key, kvp.Value);
+}
+
+```
