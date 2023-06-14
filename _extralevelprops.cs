@@ -101,15 +101,24 @@ namespace ExtraLevelProps
                 return Core.levelCollections[level.name].GetInt(key.ToLower());
             }
         }
-        public static void SetExtraProp(this Level level, string key, string value) {
-            if (!Core.IsValidProp(key)) { throw new System.ArgumentException("Illegal characters in property name \""+key+"\"."); }
-            if (!Core.IsEmptyValue(value) && !Core.IsValidProp(value)) { throw new System.ArgumentException("Illegal characters in property value \""+value+"\"."); }
+        // Returns false if the property was removed (value is null, empty, or zero), otherwise true
+        public static bool SetExtraProp(this Level level, string key, string value) {
+            if (!LevelProp.Exists(key)) { throw new System.ArgumentException("No property named \""+key+"\" has been defined, therefore it cannot be set."); }
+            if (!LevelProp.ValidCharacters(key)) { throw new System.ArgumentException("Illegal characters in property name \""+key+"\"."); }
+            if (!LevelProp.ValidCharacters(value) && !LevelProp.IsEmptyValue(value)) {
+                throw new System.ArgumentException("Illegal characters in property value \""+value+"\".");
+            }
             
             lock (Core.extrasLocker) {
                 if (!Core.levelCollections.ContainsKey(level.name)) { Core.levelCollections[level.name] = new ExtrasCollection(); }
                 key = key.ToLower();
-                if (Core.IsEmptyValue(value)) { Core.levelCollections[level.name].Remove(key); }
-                else { Core.levelCollections[level.name][key] = value; }
+                
+                if (LevelProp.IsEmptyValue(value)) {
+                    Core.levelCollections[level.name].Remove(key);
+                    return false;
+                }
+                Core.levelCollections[level.name][key] = value;
+                return true;
             }
         }
         public static bool HasExtraProp(this Level level, string key) {
@@ -126,130 +135,122 @@ namespace ExtraLevelProps
         }
     }
     
-    internal sealed class Core : Plugin {
-        public override string name { get { return "_extralevelprops"; } }
-        public override string MCGalaxy_Version { get { return "1.9.4.5"; } }
-        public override string creator { get { return "Goodly"; } }
+    internal class LevelProp {
         
+        public const string propColor = "&6";
         const string propsAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._";
-        const string propsSplitter = " = ";
-        static string[] propsSplitterSeperators = new string[] { propsSplitter };
-        
-    	internal static bool IsValidProp(string name) {
-            if (name.Length > 0 && name.ContainsAllIn(propsAlphabet)) return true;
-            return false;
-        }
-        internal static bool IsEmptyValue(string value) { return string.IsNullOrEmpty(value) || value.CaselessEq("false"); }
-        
-        internal static readonly object extrasLocker = new object();
-        internal static Dictionary<string, ExtrasCollection> levelCollections = new Dictionary<string, ExtrasCollection>();
-        
-        static string propsDirectory = "plugins/extralevelprops/";
-        static string PropsPath(string levelName) { return propsDirectory + levelName + ".properties"; }
-        static string verifiedPath = propsDirectory + "_verifiedprops.txt";
-        
+        static string verifiedPath = Core.propsDirectory + "_extralevelprops.txt";
         static readonly object verifiedLocker = new object();
-        static Dictionary<string, string> verifiedProps = new Dictionary<string, string>();
-        static void LoadVerifiedProps() {
+        static Dictionary<string, LevelProp> definedProps = new Dictionary<string, LevelProp>();
+        static string[] constructionInstruction = new string[] {
+            "# This file allows you define extra level properties. Lines starting with # are ignored.",
+            "# Place names of verified properties each on their own line. Here is the format followed by an example:",
+            "# property_name rank_permission_level description line 1|description line 2|etc",
+            "# boardgame 30 When true: Move bots like board game pieces.|You must let the map unload then load and use /ad for this to apply.",
+            "# After editing this file, you must use /server reload for the changes to apply."
+            };
+        
+        public static void PrepareDirectory() {
+            if (!File.Exists(verifiedPath)) {
+                File.WriteAllLines(verifiedPath, constructionInstruction);
+            }
+        }
+        public static void ReloadAll() {
             string[] verLines = File.ReadAllLines(verifiedPath);
             lock (verifiedLocker) {
-                verifiedProps.Clear();
+                definedProps.Clear();
                 foreach (var line in verLines) {
                     if (line.StartsWith("#")) { continue; }
-                    string[] bits = line.SplitSpaces(2);
-                    if (bits.Length != 2) { continue; }
-                    string propName = bits[0];
-                    string propDesc = bits[1];
-                    verifiedProps[propName] = propDesc;
+                    var prop = Create(line);
+                    if (prop == null) { continue; }
+                    definedProps[prop.name] = prop;
                 }
             }
         }
-        internal static bool IsVerified(string key) {
+        
+        public static List<LevelProp> AllDefined() {
             lock (verifiedLocker) {
-                return verifiedProps.ContainsKey(key.ToLower());
-            }
-        }
-        internal static List<KeyValuePair<string, string>> AllVerifiedProps() {
-            lock (verifiedLocker) {
-                var all = new List<KeyValuePair<string, string>>();
-                foreach (var pair in verifiedProps) {
-                    all.Add(new KeyValuePair<string, string>(pair.Key, pair.Value));
+                var all = new List<LevelProp>();
+                foreach (var kvp in definedProps) {
+                    all.Add(kvp.Value);
                 }
                 return all;
             }
         }
-        
-        internal const string verifiedColor = "&6";
-        internal const string unverifiedColor = "&7";
-        internal static string FormatKey(string key) { return IsVerified(key) ? verifiedColor+key : unverifiedColor+key; }
-        internal static string FormatValue(string value) {
+    	public static bool ValidCharacters(string name) {
+            if (name.Length > 0 && name.ContainsAllIn(propsAlphabet)) return true;
+            return false;
+        }
+        public static bool Exists(string key) {
+            lock (verifiedLocker) {
+                return definedProps.ContainsKey(key.ToLower());
+            }
+        }
+        public static LevelProp Get(string key) {
+            lock (verifiedLocker) {
+                LevelProp prop;
+                if (!definedProps.TryGetValue(key.ToLower(), out prop)) { return null; }
+                return prop;
+            }
+        }
+        public static string FormatValue(string value) {
             string color = "&7";
             if (value.CaselessEq("true")) { color = "&a"; }
             return color+value;
         }
-        
-        static void LoadCollection(string levelName) {
-            lock (extrasLocker) {
-                if (!File.Exists(PropsPath(levelName))) { return; }
-                string[] lines = File.ReadAllLines(PropsPath(levelName));
-                ExtrasCollection col = new ExtrasCollection();
-                
-                foreach (string line in lines) {
-                    string[] bits = line.Split(propsSplitterSeperators, 2, StringSplitOptions.RemoveEmptyEntries);
-                    if (bits.Length != 2) { continue; } //malformed key value pair
-                    if (!(IsValidProp(bits[0]) && IsValidProp(bits[1]))) { continue; } //key value pair contains illegal characters
-                    col[bits[0]] = bits[1];
-                }
-                levelCollections[levelName] = col;
-            }
-        }
-        static void UnloadCollection(string levelName) {
-            lock (extrasLocker) {
-                SaveCollectionToDisk(levelName);
-                levelCollections.Remove(levelName);
-            }
-        }
-        static void SaveCollectionToDisk(string levelName) {
-            lock (extrasLocker) {
-                if (!levelCollections.ContainsKey(levelName)) { return; }
-                ExtrasCollection col = levelCollections[levelName];
-                var kvps = col.All();
-                List<string> lines = new List<string>();
-                foreach (var kvp in kvps ) {
-                    if (IsEmptyValue(kvp.Value)) { continue; }
-                    lines.Add(kvp.Key + propsSplitter + kvp.Value);
-                }
-                if (lines.Count == 0) { File.Delete(PropsPath(levelName)); }
-                else { File.WriteAllLines(PropsPath(levelName), lines.ToArray()); }
-            }
-        }
-        static void EraseCollectionOnDisk(string levelName) {
-            lock (extrasLocker) {
-                File.Delete(PropsPath(levelName));
-            }
-        }
-        static void CopyCollectionOnDisk(string sourceName, string targetName) {
-            lock (extrasLocker) {
-                SaveCollectionToDisk(sourceName); //Save source first to write any unsaved edits to disk before copying
-                if (!File.Exists(PropsPath(sourceName))) { return; } //nothing to copy
-                File.Copy(PropsPath(sourceName), PropsPath(targetName));
-            }
+        public static bool IsEmptyValue(string value) {
+            if (string.IsNullOrEmpty(value) || value.CaselessEq("false")) { return true; }
+            int intValue;
+            if (int.TryParse(value, out intValue) && intValue == 0) { return true; }
+            return false;
         }
         
-        static void PrepareDirectory() {
-            if (!Directory.Exists(propsDirectory)) {
-                Directory.CreateDirectory(propsDirectory);
+        
+        
+        // non static members
+        string name;
+        public string coloredName { get { return propColor+name; } }
+        //LevelPermission permission;
+        public ItemPerms permission { get; private set; }
+        string[] desc;
+        
+        static LevelProp Create(string line) {
+            string[] bits = line.SplitSpaces(3);
+            if (bits.Length < 3) {
+                Logger.Log(LogType.Warning, "_extralevelprops: Not enough | separated sections to define a property in {0} ", verifiedPath);
+                return null;
             }
-            if (!File.Exists(verifiedPath)) {
-                string[] template = new string[] {
-                    "# This file allows you specify which extra level props are verified.",
-                    "# Users will be unable to set level properties that are not verified.",
-                    "# Place names of verified properties each on their own line, followed by space then a description.",
-                    "# You must reload the plugin for these to apply."
-                    };
-                File.WriteAllLines(verifiedPath, template);
+            LevelProp prop = new LevelProp();
+            
+            prop.name = bits[0];
+            if (!ValidCharacters(prop.name)) {
+                Logger.Log(LogType.Warning, "_extralevelprops: Illegal characters in property name \"{0}\" in {1}.", prop.name, verifiedPath);
+                return null;
+            }
+            int permAsInt;
+            if (!int.TryParse(bits[1], out permAsInt)) {
+                Logger.Log(LogType.Warning, "_extralevelprops: Could not parse {0} as a LevelPermission number in {1}", bits[1], verifiedPath);
+                return null;
+            }
+            prop.permission = new ItemPerms((LevelPermission)permAsInt);
+            prop.desc = bits[2].Split(new char[] { '|' });
+            
+            return prop;
+        }
+        public void Display(Player p) {
+            string intro = "  "+coloredName;
+
+            p.Message("  {0} &T{1}", coloredName, desc[0]);
+            for (int i = 1; i < desc.Length; i++) {
+                p.Message("    &H{0}", desc[i]);
             }
         }
+    }
+    
+    internal sealed class Core : Plugin {
+        public override string name { get { return "_extralevelprops"; } }
+        public override string MCGalaxy_Version { get { return "1.9.4.5"; } }
+        public override string creator { get { return "Goodly"; } }
         public override void Load(bool startup) {
             Command.Register(new CmdMapExtra());
             
@@ -263,7 +264,7 @@ namespace ExtraLevelProps
             OnLevelRenamedEvent.Register(OnLevelRenamed, Priority.Critical);
             
             PrepareDirectory();
-            LoadVerifiedProps();
+            LevelProp.ReloadAll();
             
             //initial load for any maps that are already loaded
             lock (extrasLocker) {
@@ -294,18 +295,88 @@ namespace ExtraLevelProps
             }
         }
         
+        const string propsSplitter = " = ";
+        static string[] propsSplitterSeperators = new string[] { propsSplitter };
+        
+        internal static string propsDirectory = "plugins/extralevelprops/";
+        static string PropsPath(string levelName) { return propsDirectory + levelName + ".properties"; }
+        
+        internal static readonly object extrasLocker = new object();
+        internal static Dictionary<string, ExtrasCollection> levelCollections = new Dictionary<string, ExtrasCollection>();
+        
+        static void LoadCollection(string levelName) {
+            lock (extrasLocker) {
+                if (!File.Exists(PropsPath(levelName))) { return; }
+                string[] lines = File.ReadAllLines(PropsPath(levelName));
+                ExtrasCollection col = new ExtrasCollection();
+                
+                foreach (string line in lines) {
+                    string[] bits = line.Split(propsSplitterSeperators, 2, StringSplitOptions.RemoveEmptyEntries);
+                    if (bits.Length != 2) { continue; } //malformed key value pair
+                    if (!(LevelProp.ValidCharacters(bits[0]) && LevelProp.ValidCharacters(bits[1]))) { continue; } //key value pair contains illegal characters
+                    col[bits[0]] = bits[1];
+                }
+                levelCollections[levelName] = col;
+            }
+        }
+        static void UnloadCollection(string levelName) {
+            lock (extrasLocker) {
+                SaveCollectionToDisk(levelName);
+                levelCollections.Remove(levelName);
+            }
+        }
+        static void SaveCollectionToDisk(string levelName) {
+            lock (extrasLocker) {
+                if (!levelCollections.ContainsKey(levelName)) { return; }
+                ExtrasCollection col = levelCollections[levelName];
+                var kvps = col.All();
+                List<string> lines = new List<string>();
+                foreach (var kvp in kvps ) {
+                    if (LevelProp.IsEmptyValue(kvp.Value)) { continue; }
+                    lines.Add(kvp.Key + propsSplitter + kvp.Value);
+                }
+                if (lines.Count == 0) { File.Delete(PropsPath(levelName)); }
+                else { File.WriteAllLines(PropsPath(levelName), lines.ToArray()); }
+            }
+        }
+        static void EraseCollectionOnDisk(string levelName) {
+            lock (extrasLocker) {
+                File.Delete(PropsPath(levelName));
+            }
+        }
+        static void CopyCollectionOnDisk(string sourceName, string targetName) {
+            lock (extrasLocker) {
+                SaveCollectionToDisk(sourceName); //Save source first to write any unsaved edits to disk before copying
+                if (!File.Exists(PropsPath(sourceName))) { return; } //nothing to copy
+                File.Copy(PropsPath(sourceName), PropsPath(targetName));
+            }
+        }
+        
+        static void PrepareDirectory() {
+            if (!Directory.Exists(propsDirectory)) {
+                Directory.CreateDirectory(propsDirectory);
+            }
+            LevelProp.PrepareDirectory();
+        }
+        
         static void OnConfigUpdated() {
-            LoadVerifiedProps();
+            LevelProp.ReloadAll();
         }
         
         static void OnPlayerCommand(Player p, string cmd, string message, CommandData data) {
             if (message.Length == 0 && cmd.CaselessEq("map")) {
-                Server.MainScheduler.QueueOnce(DisplayDelayed, p, TimeSpan.FromMilliseconds(50));
+                Server.MainScheduler.QueueOnce(DisplayExtraLevelProps, p, TimeSpan.FromMilliseconds(50));
             }
         }
-        static void DisplayDelayed(SchedulerTask task) {
+        static void DisplayExtraLevelProps(SchedulerTask task) {
             Player p = (Player)task.State;
-            CmdMapExtra.Display(p, false);
+            var kvps = p.level.AllExtraProps();
+            if (kvps == null || kvps.Count == 0) { return; }
+            kvps.Sort((name1, name2) => string.Compare(name1.Key, name2.Key));
+            p.Message("&TExtra map settings:");
+            foreach (var kvp in kvps) {
+                p.Message("  {0}&S: {1}", LevelProp.propColor+kvp.Key, LevelProp.FormatValue(kvp.Value));
+            }
         }
         
         static void OnLevelAdded(Level level) {
@@ -350,27 +421,6 @@ namespace ExtraLevelProps
         public override bool museumUsable { get { return false; } }
         public override LevelPermission defaultRank { get { return LevelPermission.Admin; } }
         
-        public static void Display(Player p, bool showNone) {
-            var kvps = p.level.AllExtraProps();
-            bool none = (kvps == null || kvps.Count == 0);
-            if (showNone || !none) { p.Message("&TExtra map settings:"); }
-            if (none && showNone) { p.Message("  (no extra settings have been specified)"); }
-            if (none) { return; }
-            
-            kvps.Sort((name1, name2) => string.Compare(name1.Key, name2.Key));
-            
-            foreach (var kvp in kvps) {
-                p.Message("  {0}&S: {1}", Core.FormatKey(kvp.Key), Core.FormatValue(kvp.Value));
-            }
-        }
-        public static void DisplayVerifiedProps(Player p) {
-            p.Message("Extra map properties you can set:");
-            var kvps = Core.AllVerifiedProps();
-            foreach (var kvp in kvps) {
-                p.Message("  {0}{1}&S: &H{2}", Core.verifiedColor, kvp.Key, kvp.Value);
-            }
-        }
-        
         bool CanUse(Player p) {
             bool canUse = LevelInfo.IsRealmOwner(p.name, p.level.name) || p.group.Permission >= LevelPermission.Operator;
             if (!canUse) { p.Message("You can only use &T/{0} &Son levels you own.", name); return false; }
@@ -378,41 +428,38 @@ namespace ExtraLevelProps
         }
         
         public override void Use(Player p, string message, CommandData data) {
-            if (message == "") {
-                Help(p);
-                return;
-            }
-            
-            //if (!LevelInfo.Check(p, data.Rank, p.level, "modify extra map properties")) { return; }
+            if (message == "") { Help(p); return; }
             if (!CanUse(p)) { return; }
             
             string[] words = message.SplitSpaces();
             if (words.Length > 2) { p.Message("&WToo many arguments! You may only specify one property and one value at a time."); return; }
             string key = words[0].ToLower();
             string value = words.Length > 1 ? words[1] : "";
-            try {
-                bool alreadyRemoved = !p.level.HasExtraProp(key);
-                
-                //Do not allow adding of unverified keys, but allow removing
-                if (!Core.IsEmptyValue(value) && !Core.IsVerified(key)) {
-                    p.Message("&WThere is no property \"{0}&W\".", Core.FormatKey(key));
-                    DisplayVerifiedProps(p);
-                    return;
-                }
-                
-                p.level.SetExtraProp(key, value);
-                if (Core.IsEmptyValue(value)) {
-                    if (alreadyRemoved) {
-                        p.Message("There is no property \"{0}&S\" to remove.", Core.FormatKey(key));
-                    } else {
-                        p.Message("Removed extra map property \"{0}&S\".", Core.FormatKey(key));
-                    }
-                }
-                else {
-                    p.Message("Set {0}&S to: {1}", Core.FormatKey(key), Core.FormatValue(value));
-                }
+            
+            LevelProp prop = LevelProp.Get(key);
+            
+            if (prop == null) {
+                p.Message("&WThere is no property \"{0}&W\".", key);
+                DisplayVerifiedProps(p);
+                return;
             }
-            catch (System.ArgumentException e) { p.Message("&W{0}", e.Message); }
+            if (!prop.permission.UsableBy(p)) {
+                p.Message("Only {0} can edit the {1}&S property.", prop.permission.Describe(), prop.coloredName);
+                return;
+            }
+            
+            bool alreadyRemoved = !p.level.HasExtraProp(key);
+            bool removed;
+            try {
+                removed = !p.level.SetExtraProp(key, value);
+            } catch (System.ArgumentException e) { p.Message("&W{0}", e.Message); return; }
+            
+            if (removed) {
+                if (alreadyRemoved) { p.Message("There is no property \"{0}&S\" to remove.", prop.coloredName); return; }
+                p.Message("Removed extra map property \"{0}&S\".", prop.coloredName);
+                return;
+            }
+            p.Message("Set {0}&S to: {1}", prop.coloredName, LevelProp.FormatValue(value));
         }
 
         public override void Help(Player p) {
@@ -420,6 +467,14 @@ namespace ExtraLevelProps
             p.Message("&HSets an extra map property of the current level.");
             DisplayVerifiedProps(p);
             p.Message("Use &T/Map &Sto see this map's current extra level properties.");
+        }
+        static void DisplayVerifiedProps(Player p) {
+            p.Message("Extra map properties you can set:");
+            var props = LevelProp.AllDefined();
+            foreach (var prop in props) {
+                if (!prop.permission.UsableBy(p)) { continue; }
+                prop.Display(p);
+            }
         }
     }
 }
