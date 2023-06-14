@@ -23,11 +23,11 @@ namespace ExtraLevelProps
     
     
     //Based on MCGalaxy.ExtrasCollection
-    public sealed class ExtrasCollection {
+    internal sealed class ExtrasCollection {
         readonly Dictionary<string, string> dict = new Dictionary<string, string>();
         readonly object locker = new object();
         
-        public List<KeyValuePair<string, string>> All() {
+        internal List<KeyValuePair<string, string>> All() {
             lock (locker) {
                 var all = new List<KeyValuePair<string, string>>();
                 foreach (var pair in dict) {
@@ -37,22 +37,22 @@ namespace ExtraLevelProps
             }
         }
         
-        public int Count { get { lock (locker) { return dict.Count; } } }
-        public string this[string key] {
+        internal int Count { get { lock (locker) { return dict.Count; } } }
+        internal string this[string key] {
             get { lock (locker) { return dict[key]; } }
             set { lock (locker) { dict[key] = value; } }
         }
         
-        public void Clear() { lock (locker) { dict.Clear(); } }
-        public bool ContainsKey(string key) { lock (locker) { return dict.ContainsKey(key); } }
-        public bool Remove(string key) { lock (locker) { return dict.Remove(key); } }
+        internal void Clear() { lock (locker) { dict.Clear(); } }
+        internal bool ContainsKey(string key) { lock (locker) { return dict.ContainsKey(key); } }
+        internal bool Remove(string key) { lock (locker) { return dict.Remove(key); } }
         
-        public bool TryGet(string key, out string value) {
+        internal bool TryGet(string key, out string value) {
             lock (locker) { return dict.TryGetValue(key, out value); }
         }
 
-        public bool GetBoolean(string key) { return GetBoolean(key, false); }
-        public bool GetBoolean(string key, bool defaultValue) {
+        internal bool GetBoolean(string key) { return GetBoolean(key, false); }
+        internal bool GetBoolean(string key, bool defaultValue) {
             string value;
             if (TryGet(key, out value)) {
                 try { return Convert.ToBoolean(value); }
@@ -61,8 +61,8 @@ namespace ExtraLevelProps
             return defaultValue;
         }
 
-        public int GetInt(string key) { return GetInt(key, 0); }
-        public int GetInt(string key, int defaultValue) {
+        internal int GetInt(string key) { return GetInt(key, 0); }
+        internal int GetInt(string key, int defaultValue) {
             string value;
             if (TryGet(key, out value)) {
                 try { return Convert.ToInt32(value); }
@@ -71,8 +71,8 @@ namespace ExtraLevelProps
             return defaultValue;
         }
 
-        public string GetString(string key) { return GetString(key, null); }
-        public string GetString(string key, string defaultValue) {
+        internal string GetString(string key) { return GetString(key, null); }
+        internal string GetString(string key, string defaultValue) {
             string value;
             if (TryGet(key, out value)) {
                 try { return Convert.ToString(value); }
@@ -126,7 +126,7 @@ namespace ExtraLevelProps
         }
     }
     
-    public sealed class Core : Plugin {
+    internal sealed class Core : Plugin {
         public override string name { get { return "_extralevelprops"; } }
         public override string MCGalaxy_Version { get { return "1.9.4.5"; } }
         public override string creator { get { return "Goodly"; } }
