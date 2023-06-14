@@ -1,5 +1,5 @@
 # _extralevelprops.cs
-This plugin adds the command `/mapext` which allows adding extra properties that are displayed in `/map`. These properties do not do anything on their own, but they can be read by other plugins to add functionality. After you load this plugin, you can use *plugins/extralevelprops/_verifiedprops.txt* to define which extra properties can be set by players.
+This plugin adds the command `/mapext` which allows adding extra properties that are displayed in `/map`. These properties do not do anything on their own, but they can be read by other plugins to add functionality. After you load this plugin, edit `plugins/extralevelprops/_extralevelprops.txt` to define extra properties. This must be done in order to set them.
 
 ## Usage in plugins
 At the top of your plugin source code, add:
@@ -50,8 +50,10 @@ int maxLives = p.level.GetExtraPropInt("max_lives");
 ```
 
 ```CS
-public static void SetExtraProp(this Level level, string key, string value)
+public static bool SetExtraProp(this Level level, string key, string value)
 //Set level properties through plugin code if you do not want to use or allow the use of /mapext
+//Returns false if the property was removed (value is null, empty, or 0), otherwise true.
+//This method will throw a System.ArgumentException if you attempt to set a property that has not been defined yet.
 //This method will throw a System.ArgumentException if you pass a key or value with characters that are not included in
 //the allowed character set: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._
 
