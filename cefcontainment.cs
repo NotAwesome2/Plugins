@@ -120,7 +120,7 @@ namespace MCGalaxy {
                 if (url.StartsWith(site)) { allowed = true; break; }
             }
             if (url.CaselessContains("redirect")) { allowed = false; }
-            if (!allowed) { p.Message("&WThe url {0} &Wis not allowed in cef.", url); return false; }
+            if (!allowed) { p.Message("&WThe url {0} is not allowed in cef.", url); return false; }
             
             return true;
         }
