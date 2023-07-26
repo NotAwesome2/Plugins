@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Collections.Generic;
 using System.IO;
@@ -113,7 +114,8 @@ namespace MCGalaxy {
             string url = null;
             foreach (string arg in args) {
                 if (arg[0] == '-') { continue; } //flag, ignore
-                url = arg;
+                if (Uri.IsWellFormedUriString(arg, UriKind.Absolute)) url = arg; //check if we are dealing with a valid url
+                if (Regex.IsMatch(arg, @"[0-9A-Za-z_-]{10}[048AEIMQUYcgkosw]")) url = null; //check if we are dealing with a youtube video id (regex is from https://webapps.stackexchange.com/a/101153)
             }
             if (url == null) { return true; } //no url, okay to send
             
