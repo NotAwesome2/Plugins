@@ -12,7 +12,7 @@ namespace MCGalaxy {
     
     public sealed class PluginCefContainment : Plugin {
         
-        static string[] allowedWebsites = new string[] { "https://www.youtube.com/", "https://youtu.be/", "https://i.imgur.com" };
+        static string[] allowedWebsites = new string[] { "https://www.youtube.com", "https://youtube.com", "https://youtu.be", "https://i.imgur.com" };
         
         public override string name { get { return "CefContainment"; } }
         public override string MCGalaxy_Version { get { return "1.9.4.9"; } }
@@ -120,7 +120,7 @@ namespace MCGalaxy {
                 if (url.StartsWith(site)) { allowed = true; break; }
             }
             if (url.CaselessContains("redirect")) { allowed = false; }
-            if (!allowed) { p.Message("&WThe url {0} is not allowed in cef.", url); return false; }
+            if (!allowed) { p.Message("&WThe url {0} &Wis not allowed in cef.", url); return false; }
             
             return true;
         }
