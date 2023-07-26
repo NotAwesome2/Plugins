@@ -12,7 +12,7 @@ namespace MCGalaxy {
     
     public sealed class PluginCefContainment : Plugin {
         
-        static string[] allowedWebsites = new string[] { "https://www.youtube.com/", "https://youtu.be/", "https://i.imgur.com" };
+        static string[] allowedWebsites = new string[] { "https://www.youtube.com", "https://youtube.com", "https://youtu.be", "https://i.imgur.com" };
         
         public override string name { get { return "CefContainment"; } }
         public override string MCGalaxy_Version { get { return "1.9.4.9"; } }
