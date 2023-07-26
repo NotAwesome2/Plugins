@@ -25,7 +25,7 @@ Additional features:
 - Messages containing bad words aren't sent at all. OPs are informed what word they tried to use.
 
 ## nocefdm.cs
-Disables cef from sending automatic DMs. This prevents users from automatically syncing cef screens when they join a map.
+Disables cef from sending automatic DMs. This prevents users from automatically syncing cef screens when they join a map, which could be used to bypass cefcontainment.
 
 ## grc.cs
 This plugin adds /GotoRandomCool, which is like /gotorandom, but based on a curated list. The list can be managed with the /grc command.
