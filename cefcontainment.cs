@@ -91,7 +91,7 @@ namespace MCGalaxy {
         
         
         
-        static string[] urlCommands = new string[] { "create", "play", "search", "queue" };
+        static string[] urlCommands = new string[] { "create", "play", "queue" };
         static bool AllowedCefCommand(Player p, string message) {
             
             string[] cefCommandArgs = message.SplitSpaces(2);
