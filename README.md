@@ -17,6 +17,15 @@ An example font (the font used in the webclient) has been provided in the writef
 
 ## cefcontainment.cs
 This plugin makes it so that only players who have permission to build in the map may use [cef](https://github.com/SpiralP/classicube-cef-loader-plugin) commands.
+Additional features:
+- Adds /chat command, allows you to send to local chat without being in a local chat map
+- Prefixing message with $$ sends it to local chat
+- Only youtube and imgur are allowed in cef commands
+- Cef click is disabled for security reasons
+- Messages containing bad words aren't sent at all. OPs are informed what word they tried to use.
+
+## nocefdm.cs
+Disables cef from sending automatic DMs. This prevents users from automatically syncing cef screens when they join a map.
 
 ## grc.cs
 This plugin adds /GotoRandomCool, which is like /gotorandom, but based on a curated list. The list can be managed with the /grc command.
