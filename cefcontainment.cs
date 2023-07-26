@@ -7,6 +7,7 @@ using MCGalaxy.Commands;
 using MCGalaxy.Events.ServerEvents;
 using MCGalaxy.Events.LevelEvents;
 using MCGalaxy.Events.PlayerEvents;
+using MCGalaxy.Modules.Relay.Discord;
 
 namespace MCGalaxy {
     
@@ -64,6 +65,7 @@ namespace MCGalaxy {
                 }
                 
                 Chat.MessageOps("&STo Ops: "+p.name+" was blocked from saying \""+message+"\"");
+                DiscordPlugin.Bot.SendStaffMessage("To Ops: "+p.name+" was blocked from saying \""+message+"\"");
                 Logger.Log(LogType.SuspiciousActivity, "CEFcontainment: {0} was blocked from saying \"{1}\"", p.name, message);
             }
             
