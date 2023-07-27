@@ -1,7 +1,10 @@
+//reference System.dll
+
 using System;
 using System.Threading;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using MCGalaxy;
 using MCGalaxy.Commands;
 using MCGalaxy.Events.ServerEvents;
@@ -89,7 +92,7 @@ namespace MCGalaxy {
         
         
         
-        static string[] urlCommands = new string[] { "create", "play", "search", "queue" };
+        static string[] urlCommands = new string[] { "create", "play", "queue" };
         static bool AllowedCefCommand(Player p, string message) {
             
             string[] cefCommandArgs = message.SplitSpaces(2);
@@ -108,21 +111,33 @@ namespace MCGalaxy {
             
             string[] args = cefArgs.SplitSpaces();
             
-            string url = null;
+            //You can paste multiple urls in one command, check every single one just in case
+            List<string> urls = new List<string>();
             foreach (string arg in args) {
                 if (arg[0] == '-') { continue; } //flag, ignore
-                url = arg;
+                urls.Add(arg);
             }
-            if (url == null) { return true; } //no url, okay to send
+            if (urls.Count == 0) { return true; } //no urls, okay to send
+
+            bool allowed = true;
+            foreach (string url in urls) {
+                if (url.CaselessContains("redirect")) { allowed = false; break; }
+                
+                bool whitelistMatch = false;
+                foreach (string site in allowedWebsites) {
+                    if (url.StartsWith(site) || IsYoutubeVideoID(url)) { whitelistMatch = true; break; }
+                }
+                if (!whitelistMatch) { allowed = false; }
+            }
             
-            bool allowed = false;
-            foreach (string site in allowedWebsites) {
-                if (url.StartsWith(site)) { allowed = true; break; }
-            }
-            if (url.CaselessContains("redirect")) { allowed = false; }
-            if (!allowed) { p.Message("&WThe url {0} is not allowed in cef.", url); return false; }
+            if (!allowed) { p.Message("&WThe url {0} is not allowed in cef.", urls[0]); return false; }
             
             return true;
+        }
+        //cef can play videos from pasting only a video ID alone (thanks icanttellyou)
+        static bool IsYoutubeVideoID(string s) {
+            //(regex is from https://webapps.stackexchange.com/a/101153)
+            return Regex.IsMatch(s, @"[0-9A-Za-z_-]{10}[048AEIMQUYcgkosw]");
         }
     }
     
