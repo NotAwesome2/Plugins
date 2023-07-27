@@ -10,12 +10,13 @@ using MCGalaxy.Commands;
 using MCGalaxy.Events.ServerEvents;
 using MCGalaxy.Events.LevelEvents;
 using MCGalaxy.Events.PlayerEvents;
+using MCGalaxy.Modules.Relay.Discord;
 
 namespace MCGalaxy {
     
     public sealed class PluginCefContainment : Plugin {
         
-        static string[] allowedWebsites = new string[] { "https://www.youtube.com/", "https://youtu.be/", "https://i.imgur.com" };
+        static string[] allowedWebsites = new string[] { "https://www.youtube.com", "https://youtube.com", "https://youtu.be", "https://i.imgur.com" };
         
         public override string name { get { return "CefContainment"; } }
         public override string MCGalaxy_Version { get { return "1.9.4.9"; } }
@@ -67,6 +68,7 @@ namespace MCGalaxy {
                 }
                 
                 Chat.MessageOps("&STo Ops: "+p.name+" was blocked from saying \""+message+"\"");
+                DiscordPlugin.Bot.SendStaffMessage("To Ops: "+p.name+" was blocked from saying \""+message+"\"");
                 Logger.Log(LogType.SuspiciousActivity, "CEFcontainment: {0} was blocked from saying \"{1}\"", p.name, message);
             }
             
