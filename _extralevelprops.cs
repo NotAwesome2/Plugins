@@ -143,7 +143,7 @@ namespace ExtraLevelProps
         static readonly object verifiedLocker = new object();
         static Dictionary<string, LevelProp> definedProps = new Dictionary<string, LevelProp>();
         static string[] constructionInstruction = new string[] {
-            "# This file allows you define extra level properties. Lines starting with # are ignored.",
+            "# This file allows you to define extra level properties. Lines starting with # are ignored.",
             "# Place names of verified properties each on their own line. Here is the format followed by an example:",
             "# property_name rank_permission_level description line 1|description line 2|etc",
             "# boardgame 30 When true: Move bots like board game pieces.|You must let the map unload then load and use /ad for this to apply.",
