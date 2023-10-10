@@ -506,6 +506,7 @@ namespace NA2 {
         protected override bool CanUse(Player p) {
             bool canUse = false;
             if (LevelInfo.IsRealmOwner(p.name, p.level.name)) canUse = true;
+            if (!LevelInfo.Check(p, p.group.Permission, p.level, "make new blocks in this level")) { return false; } //restrict making new blocks if you can't edit blockprops
             if (p.group.Permission >= LevelPermission.Operator && p.group.Permission >= p.level.BuildAccess.Min) { canUse = true; }
             if (!canUse) { p.Message("&cYou can only use this command on your own maps."); }
             return canUse;
