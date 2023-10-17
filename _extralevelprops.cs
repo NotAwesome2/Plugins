@@ -24,6 +24,8 @@ namespace ExtraLevelProps
     
     //Based on MCGalaxy.ExtrasCollection
     internal sealed class ExtrasCollection {
+        
+        
         readonly Dictionary<string, string> dict = new Dictionary<string, string>();
         readonly object locker = new object();
         
@@ -85,20 +87,20 @@ namespace ExtraLevelProps
     public static class ExtraLevelProps {
         public static string GetExtraPropString(this Level level, string key, string defaultValue = "") {
             lock (Core.extrasLocker) {
-                if (!Core.levelCollections.ContainsKey(level.name)) { return defaultValue; }
-                return Core.levelCollections[level.name].GetString(key.ToLower(), defaultValue);
+                if (!Core.levelCollections.ContainsKey(level)) { return defaultValue; }
+                return Core.levelCollections[level].GetString(key.ToLower(), defaultValue);
             }
         }
         public static bool GetExtraPropBool(this Level level, string key) {
             lock (Core.extrasLocker) {
-                if (!Core.levelCollections.ContainsKey(level.name)) { return false; }
-                return Core.levelCollections[level.name].GetBoolean(key.ToLower());
+                if (!Core.levelCollections.ContainsKey(level)) { return false; }
+                return Core.levelCollections[level].GetBoolean(key.ToLower());
             }
         }
         public static int GetExtraPropInt(this Level level, string key) {
             lock (Core.extrasLocker) {
-                if (!Core.levelCollections.ContainsKey(level.name)) { return 0; }
-                return Core.levelCollections[level.name].GetInt(key.ToLower());
+                if (!Core.levelCollections.ContainsKey(level)) { return 0; }
+                return Core.levelCollections[level].GetInt(key.ToLower());
             }
         }
         // Returns false if the property was removed (value is null, empty, or zero), otherwise true
@@ -110,27 +112,27 @@ namespace ExtraLevelProps
             }
             
             lock (Core.extrasLocker) {
-                if (!Core.levelCollections.ContainsKey(level.name)) { Core.levelCollections[level.name] = new ExtrasCollection(); }
+                if (!Core.levelCollections.ContainsKey(level)) { Core.levelCollections[level] = new ExtrasCollection(); }
                 key = key.ToLower();
                 
                 if (LevelProp.IsEmptyValue(value)) {
-                    Core.levelCollections[level.name].Remove(key);
+                    Core.levelCollections[level].Remove(key);
                     return false;
                 }
-                Core.levelCollections[level.name][key] = value;
+                Core.levelCollections[level][key] = value;
                 return true;
             }
         }
         public static bool HasExtraProp(this Level level, string key) {
             lock (Core.extrasLocker) {
-                if (!Core.levelCollections.ContainsKey(level.name)) { return false; }
-                return Core.levelCollections[level.name].ContainsKey(key.ToLower());
+                if (!Core.levelCollections.ContainsKey(level)) { return false; }
+                return Core.levelCollections[level].ContainsKey(key.ToLower());
             }
         }
         public static List<KeyValuePair<string, string>> AllExtraProps(this Level level) {
             lock (Core.extrasLocker) {
-                if (!Core.levelCollections.ContainsKey(level.name)) { return null; }
-                return Core.levelCollections[level.name].All();
+                if (!Core.levelCollections.ContainsKey(level)) { return null; }
+                return Core.levelCollections[level].All();
             }
         }
     }
@@ -238,7 +240,6 @@ namespace ExtraLevelProps
             return prop;
         }
         public void Display(Player p) {
-            string intro = "  "+coloredName;
 
             p.Message("  {0} &T{1}", coloredName, desc[0]);
             for (int i = 1; i < desc.Length; i++) {
@@ -270,7 +271,7 @@ namespace ExtraLevelProps
             lock (extrasLocker) {
                 Level[] levels = LevelInfo.Loaded.Items;
                 foreach (Level level in levels) {
-                    LoadCollection(level.name);
+                    LoadCollection(level);
                 }
             }
         }
@@ -290,7 +291,7 @@ namespace ExtraLevelProps
             lock (extrasLocker) {
                 Level[] levels = LevelInfo.Loaded.Items;
                 foreach (Level level in levels) {
-                    UnloadCollection(level.name);
+                    UnloadCollection(level);
                 }
             }
         }
@@ -302,12 +303,12 @@ namespace ExtraLevelProps
         static string PropsPath(string levelName) { return propsDirectory + levelName + ".properties"; }
         
         internal static readonly object extrasLocker = new object();
-        internal static Dictionary<string, ExtrasCollection> levelCollections = new Dictionary<string, ExtrasCollection>();
+        internal static Dictionary<Level, ExtrasCollection> levelCollections = new Dictionary<Level, ExtrasCollection>();
         
-        static void LoadCollection(string levelName) {
+        static void LoadCollection(Level level) {
             lock (extrasLocker) {
-                if (!File.Exists(PropsPath(levelName))) { return; }
-                string[] lines = File.ReadAllLines(PropsPath(levelName));
+                if (!File.Exists(PropsPath(level.name))) { return; }
+                string[] lines = File.ReadAllLines(PropsPath(level.name));
                 ExtrasCollection col = new ExtrasCollection();
                 
                 foreach (string line in lines) {
@@ -316,27 +317,35 @@ namespace ExtraLevelProps
                     if (!(LevelProp.ValidCharacters(bits[0]) && LevelProp.ValidCharacters(bits[1]))) { continue; } //key value pair contains illegal characters
                     col[bits[0]] = bits[1];
                 }
-                levelCollections[levelName] = col;
+                levelCollections[level] = col;
             }
         }
-        static void UnloadCollection(string levelName) {
+        static void UnloadCollection(Level level) {
             lock (extrasLocker) {
-                SaveCollectionToDisk(levelName);
-                levelCollections.Remove(levelName);
+                SaveCollectionToDisk(level);
+                levelCollections.Remove(level);
             }
         }
         static void SaveCollectionToDisk(string levelName) {
             lock (extrasLocker) {
-                if (!levelCollections.ContainsKey(levelName)) { return; }
-                ExtrasCollection col = levelCollections[levelName];
+                Level[] levels = LevelInfo.Loaded.Items;
+                foreach (Level level in levels) {
+                    if (level.name == levelName) { SaveCollectionToDisk(level); }
+                }
+            }
+        }
+        static void SaveCollectionToDisk(Level level) {
+            lock (extrasLocker) {
+                if (!levelCollections.ContainsKey(level)) { return; }
+                ExtrasCollection col = levelCollections[level];
                 var kvps = col.All();
                 List<string> lines = new List<string>();
                 foreach (var kvp in kvps ) {
                     if (LevelProp.IsEmptyValue(kvp.Value)) { continue; }
                     lines.Add(kvp.Key + propsSplitter + kvp.Value);
                 }
-                if (lines.Count == 0) { File.Delete(PropsPath(levelName)); }
-                else { File.WriteAllLines(PropsPath(levelName), lines.ToArray()); }
+                if (lines.Count == 0) { File.Delete(PropsPath(level.name)); }
+                else { File.WriteAllLines(PropsPath(level.name), lines.ToArray()); }
             }
         }
         static void EraseCollectionOnDisk(string levelName) {
@@ -380,12 +389,12 @@ namespace ExtraLevelProps
         }
         
         static void OnLevelAdded(Level level) {
-            LoadCollection(level.name);
+            LoadCollection(level);
             
             //MsgGoodly("OnLevelAdded {0}", level.name);
         }
         static void OnLevelRemoved(Level level) {
-            UnloadCollection(level.name);
+            UnloadCollection(level);
             
             //MsgGoodly("OnLevelRemoved {0}", level.name);
         }
