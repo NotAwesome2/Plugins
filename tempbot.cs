@@ -32,7 +32,7 @@ namespace MCGalaxy {
         public delegate void DoAI(Player p, PlayerBot bot);
         static Dictionary<string, DoAI> AIDict = new Dictionary<string, DoAI>();
         
-        public const byte botIDstartValue = 128;
+        public const byte botIDstartValue = 128; //-128 signed
         public static Dictionary<string, Tinfo> tinfoFor = new Dictionary<string, Tinfo>();
         
         public static byte NextFreeID(Player p) {
@@ -166,7 +166,16 @@ namespace MCGalaxy {
             }
             
             bot.AIName = trailingInstructions;
-            Command.Find("runscript").Use(p, runscriptArgs);
+            
+            
+            try {
+                CommandData data = default(CommandData);
+                data.Context = CommandContext.MessageBlock;
+                Command.Find("runscript").Use(p, runscriptArgs, data);
+            } catch (Exception e) {
+                p.Message("An error occured when running tempbot runscript command! {0}", e.Message);
+                p.Message("Please tell Goodly.");
+            }
         }
         
         static void DoMessage(Player p, PlayerBot bot) {
@@ -546,9 +555,12 @@ namespace MCGalaxy {
             public override bool museumUsable { get { return false; } }
             public override LevelPermission defaultRank { get { return LevelPermission.Operator; } }
             
-            public override void Use(Player p, string message, CommandData data) {      
+            public override void Use(Player p, string message, CommandData data) {
+                if (p.name.EndsWith("-")) { return; } //Betacraft not allowed to use this
                 if (message.CaselessEq("where")) { DoWhere(p); return; }
                 if (!CanUse(p, data)) { return; }
+                
+                
                 
                 if (message.Length == 0) { Help(p); return; }
                 string[] args = message.SplitSpaces(2);
