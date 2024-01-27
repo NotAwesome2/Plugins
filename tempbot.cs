@@ -607,6 +607,12 @@ namespace MCGalaxy {
                     return;
                 }
                 
+                if (args[0].CaselessEq("rot")) {
+                  if (args.Length < 2) { p.Message("%cYou need args for botName, rotX, rotY and rotZ."); return; }
+                  TryRot(p, args[1]);
+                  return;
+                }
+                
                 Help(p);
             }
             
@@ -803,6 +809,38 @@ namespace MCGalaxy {
                 bot.AIName = AIName;
             }
             
+            void TryRot(Player p, string message) {
+                string[] args = message.Split(' ');
+                if (args.Length < 4) { p.Message("%cYou need args for botName, rotX, rotY and rotZ."); return; }
+                
+                PlayerBot bot = GetBotAtName(p, args[0]);
+                if (bot != null) {
+                    int rotx = 0, roty = 0, rotz = 0;
+                    if (!CommandParser.GetInt(p, args[1], "x rotation", ref rotx)) { return; }
+                    if (!CommandParser.GetInt(p, args[2], "y rotation", ref roty)) { return; }
+                    if (!CommandParser.GetInt(p, args[3], "z rotation", ref rotz)) { return; }
+                    Rot(p, bot, rotx, roty, rotz);
+                }
+            }
+            
+            public static void Rot(Player p, PlayerBot bot, int rotx, int roty, int rotz) {
+                byte angle_x = Orientation.DegreesToPacked(rotx);
+                byte angle_y = Orientation.DegreesToPacked(roty);
+                byte angle_z = Orientation.DegreesToPacked(rotz);
+                
+                Orientation rot = bot.Rot;
+                rot.RotX = angle_x;
+                rot.RotY = angle_y;
+                rot.RotZ = angle_z;
+                bot.Rot = rot;
+                
+                if (p.Supports(CpeExt.EntityProperty)) {
+                    p.Send(Packet.EntityProperty(bot.id, EntityProp.RotX, rotx));
+                    p.Send(Packet.EntityProperty(bot.id, EntityProp.RotY, roty));
+                    p.Send(Packet.EntityProperty(bot.id, EntityProp.RotZ, rotz));
+                }
+            }
+            
             static PlayerBot GetBotAtName(Player p, string botName) {
                 Tinfo list;
                 if (!tinfoFor.TryGetValue(p.name, out list) || list.botList.Count == 0)
@@ -832,7 +870,10 @@ namespace MCGalaxy {
                 p.Message("%H Sets skin of a client-side bot.");
                 p.Message("%T/TempBot ai [botName] [ai arguments]");
                 p.Message("%H Sets ai. Use %T/help tempbot ai %Hfor more info.");
-                p.Message("%T/TempBot where %H- puts your current X, Y, Z, yaw and pitch into chat for copy pasting.");
+                p.Message("%T/TempBot where");
+                p.Message("%HPuts your current X, Y, Z, yaw and pitch into chat for copy pasting.");
+                p.Message("%T/TempBot rot [botName] [rotX rotY rotZ]");
+                p.Message("%HSets the XYZ rotation of a client-side bot.");
             }
             
             public override void Help(Player p, string message) {
