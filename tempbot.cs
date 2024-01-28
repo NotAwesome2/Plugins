@@ -202,15 +202,16 @@ namespace MCGalaxy {
             
             ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             bot.AIName = trailingInstructions;
-            
+
+            int rotx = 0, roty = 0, rotz = 0;
             string[] bits = instruction.SplitSpaces(2);
             if (bits.Length > 1) {
                 string[] args = bits[1].Split(' ');
                 if (args.Length >= 3) {
                     if (
-                        Int32.TryParse(args[0], out x) &&
-                        Int32.TryParse(args[1], out y) &&
-                        Int32.TryParse(args[2], out z)
+                        Int32.TryParse(args[0], out rotx) &&
+                        Int32.TryParse(args[1], out roty) &&
+                        Int32.TryParse(args[2], out rotz)
                        ) {
                         CmdTempBot.RotBot(p, bot, rotx, roty, rotz);
                     } else {
@@ -925,8 +926,8 @@ namespace MCGalaxy {
                     p.Message("%H Use ; instead and it will become ,");
                     p.Message("%Tremove");
                     p.Message("%H Removes this tempbot.");
-                    p.Message("%Trot [rotX rotY rotZ]")
-                    p.message("%H Sets rotation of tempbot.");
+                    p.Message("%Trot [rotX rotY rotZ]");
+                    p.Message("%H Sets rotation of tempbot.");
                     p.Message("%HYou can chain AI together with commas. e.g:");
                     p.Message("%Hstare 10,wait 20,move 32 64 30");
                     p.Message("%HPlease note the (lack of) spaces.");
