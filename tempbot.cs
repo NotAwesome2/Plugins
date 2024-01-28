@@ -203,17 +203,37 @@ namespace MCGalaxy {
             ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
             bot.AIName = trailingInstructions;
 
-            int rotx = 0, roty = 0, rotz = 0;
             string[] bits = instruction.SplitSpaces(2);
             if (bits.Length > 1) {
                 string[] args = bits[1].Split(' ');
                 if (args.Length >= 3) {
+                    int rotx = 0, roty = 0, rotz = 0;
                     if (
                         Int32.TryParse(args[0], out rotx) &&
                         Int32.TryParse(args[1], out roty) &&
                         Int32.TryParse(args[2], out rotz)
                        ) {
                         CmdTempBot.RotBot(p, bot, rotx, roty, rotz);
+                    } else {
+                        p.Message("%cCould not parse one or more arguments of rot.");
+                    }
+                } else if (args.Length >= 2) {
+                    bool prop_error = false;
+                    
+                    EntityProp prop = EntityProp.RotX;
+                    if (args[0].CaselessEq("x")) {
+                        prop = EntityProp.RotX;
+                    } else if (args[0].CaselessEq("y")) {
+                        prop = EntityProp.RotY;
+                    } else if (args[0].CaselessEq("z")) {
+                        prop = EntityProp.RotZ;
+                    } else {
+                        prop_error = true;
+                    }
+                    
+                    int angle = 0;
+                    if (!prop_error && Int32.TryParse(args[1], out angle)) {
+                        CmdTempBot.RotAxisBot(p, bot, prop, angle);
                     } else {
                         p.Message("%cCould not parse one or more arguments of rot.");
                     }
@@ -638,7 +658,7 @@ namespace MCGalaxy {
                 }
                 
                 if (args[0].CaselessEq("rot")) {
-                  if (args.Length < 2) { p.Message("%cYou need args for botName, rotX, rotY and rotZ."); return; }
+                  if (args.Length < 2) { p.Message("%cYou need args for botName, axis and angle OR botName, rotX, rotY and rotZ."); return; }
                   TryRot(p, args[1]);
                   return;
                 }
@@ -841,15 +861,44 @@ namespace MCGalaxy {
             
             void TryRot(Player p, string message) {
                 string[] args = message.Split(' ');
-                if (args.Length < 4) { p.Message("%cYou need args for botName, rotX, rotY and rotZ."); return; }
+                if (args.Length < 3) { p.Message("%cYou need args for botName, axis and angle OR botName, rotX, rotY and rotZ."); return; }
                 
                 PlayerBot bot = GetBotAtName(p, args[0]);
                 if (bot != null) {
-                    int rotx = 0, roty = 0, rotz = 0;
-                    if (!CommandParser.GetInt(p, args[1], "x rotation", ref rotx)) { return; }
-                    if (!CommandParser.GetInt(p, args[2], "y rotation", ref roty)) { return; }
-                    if (!CommandParser.GetInt(p, args[3], "z rotation", ref rotz)) { return; }
-                    RotBot(p, bot, rotx, roty, rotz);
+                    if (args.Length >= 4) {
+                        int rotx = 0, roty = 0, rotz = 0;
+                        if (!CommandParser.GetInt(p, args[1], "X rotation", ref rotx)) { return; }
+                        if (!CommandParser.GetInt(p, args[2], "Y rotation", ref roty)) { return; }
+                        if (!CommandParser.GetInt(p, args[3], "Z rotation", ref rotz)) { return; }
+                        RotBot(p, bot, rotx, roty, rotz);
+                    } else {
+                        int angle = 0;
+                        if (!CommandParser.GetInt(p, args[2], "Angle", ref angle)) { return; }
+
+                        if (args[1].CaselessEq("x")) {
+                          RotAxisBot(p, bot, EntityProp.RotX, angle);
+                        } else if (args[1].CaselessEq("y")) {
+                          RotAxisBot(p, bot, EntityProp.RotY, angle);
+                        } else if (args[1].CaselessEq("z")) {
+                          RotAxisBot(p, bot, EntityProp.RotZ, angle);
+                        } else {
+                          p.Message("%cAxis must be X, Y or Z.");
+                        }
+                    }
+                }
+            }
+
+            public static void RotAxisBot(Player p, PlayerBot bot, EntityProp prop, int value) {
+                byte angle = Orientation.DegreesToPacked(value);
+                
+                Orientation rot = bot.Rot;
+                if (prop == EntityProp.RotX) rot.RotX = angle;
+                if (prop == EntityProp.RotY) rot.RotY = angle;
+                if (prop == EntityProp.RotZ) rot.RotZ = angle;
+                bot.Rot = rot;
+                
+                if (p.Supports(CpeExt.EntityProperty)) {
+                    p.Send(Packet.EntityProperty(bot.id, prop, value));
                 }
             }
             
@@ -902,6 +951,7 @@ namespace MCGalaxy {
                 p.Message("%H Sets ai. Use %T/help tempbot ai %Hfor more info.");
                 p.Message("%T/TempBot where");
                 p.Message("%HPuts your current X, Y, Z, yaw and pitch into chat for copy pasting.");
+                p.Message("%T/TempBot rot [botName] x/y/z [angle]");
                 p.Message("%T/TempBot rot [botName] [rotX rotY rotZ]");
                 p.Message("%HSets the XYZ rotation of a client-side bot.");
             }
@@ -926,6 +976,7 @@ namespace MCGalaxy {
                     p.Message("%H Use ; instead and it will become ,");
                     p.Message("%Tremove");
                     p.Message("%H Removes this tempbot.");
+                    p.Message("%Trot x/y/z [angle]");
                     p.Message("%Trot [rotX rotY rotZ]");
                     p.Message("%H Sets rotation of tempbot.");
                     p.Message("%HYou can chain AI together with commas. e.g:");
