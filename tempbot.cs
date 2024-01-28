@@ -70,6 +70,7 @@ namespace MCGalaxy {
             AIDict["message"] = DoMessage;
             AIDict["msg"] = DoMessage;
             AIDict["runscript"] = DoRunScript;
+            AIDict["rot"] = DoRot;
             
             Activate();
         }
@@ -193,6 +194,34 @@ namespace MCGalaxy {
             
             bot.AIName = trailingInstructions;
             p.Message(message.Replace(';', ','));
+        }
+
+        static void DoRot(Player p, PlayerBot bot) {
+            string instruction;
+            string trailingInstructions;
+            
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
+            bot.AIName = trailingInstructions;
+            
+            string[] bits = instruction.SplitSpaces(2);
+            if (bits.Length > 1) {
+                string[] args = bits[1].Split(' ');
+                if (args.Length >= 3) {
+                    if (
+                        Int32.TryParse(args[0], out x) &&
+                        Int32.TryParse(args[1], out y) &&
+                        Int32.TryParse(args[2], out z)
+                       ) {
+                        CmdTempBot.RotBot(p, bot, rotx, roty, rotz);
+                    } else {
+                        p.Message("%cCould not parse one or more arguments of rot.");
+                    }
+                } else {
+                    p.Message("%cNot enough arguments provided for rot.");
+                }
+            } else {
+                p.Message("%cNo arguments were provided for rot.");
+            }
         }
         
         static void DoTP(Player p, PlayerBot bot) {
@@ -819,11 +848,11 @@ namespace MCGalaxy {
                     if (!CommandParser.GetInt(p, args[1], "x rotation", ref rotx)) { return; }
                     if (!CommandParser.GetInt(p, args[2], "y rotation", ref roty)) { return; }
                     if (!CommandParser.GetInt(p, args[3], "z rotation", ref rotz)) { return; }
-                    Rot(p, bot, rotx, roty, rotz);
+                    RotBot(p, bot, rotx, roty, rotz);
                 }
             }
             
-            public static void Rot(Player p, PlayerBot bot, int rotx, int roty, int rotz) {
+            public static void RotBot(Player p, PlayerBot bot, int rotx, int roty, int rotz) {
                 byte angle_x = Orientation.DegreesToPacked(rotx);
                 byte angle_y = Orientation.DegreesToPacked(roty);
                 byte angle_z = Orientation.DegreesToPacked(rotz);
@@ -896,6 +925,8 @@ namespace MCGalaxy {
                     p.Message("%H Use ; instead and it will become ,");
                     p.Message("%Tremove");
                     p.Message("%H Removes this tempbot.");
+                    p.Message("%Trot [rotX rotY rotZ]")
+                    p.message("%H Sets rotation of tempbot.");
                     p.Message("%HYou can chain AI together with commas. e.g:");
                     p.Message("%Hstare 10,wait 20,move 32 64 30");
                     p.Message("%HPlease note the (lack of) spaces.");
