@@ -71,6 +71,7 @@ namespace MCGalaxy {
             AIDict["msg"] = DoMessage;
             AIDict["runscript"] = DoRunScript;
             AIDict["rot"] = DoRot;
+            AIDict["scale"] = DoScale;
             
             Activate();
         }
@@ -242,6 +243,55 @@ namespace MCGalaxy {
                 }
             } else {
                 p.Message("%cNo arguments were provided for rot.");
+            }
+        }
+
+        static void DoScale(Player p, PlayerBot bot) {
+            string instruction;
+            string trailingInstructions;
+            
+            ParseInstructions(bot.AIName, out instruction, out trailingInstructions);
+            bot.AIName = trailingInstructions;
+
+            string[] bits = instruction.SplitSpaces(2);
+            if (bits.Length > 1) {
+                string[] args = bits[1].Split(' ');
+                if (args.Length >= 3) {
+                    float scalex = 0, scaley = 0, scalez = 0;
+                    if (
+                        float.TryParse(args[0], out scalex) &&
+                        float.TryParse(args[1], out scaley) &&
+                        float.TryParse(args[2], out scalez)
+                       ) {
+                        CmdTempBot.ScaleBot(p, bot, scalex, scaley, scalez);
+                    } else {
+                        p.Message("%cCould not parse one or more arguments of scale.");
+                    }
+                } else if (args.Length >= 2) {
+                    bool parse_err = false;
+                    
+                    EntityProp axis = EntityProp.ScaleX;
+                    if (args[0].CaselessEq("x")) {
+                        axis = EntityProp.ScaleX;
+                    } else if (args[0].CaselessEq("y")) {
+                        axis = EntityProp.ScaleY;
+                    } else if (args[0].CaselessEq("z")) {
+                        axis = EntityProp.ScaleZ;
+                    } else {
+                        parse_err = true;
+                    }
+                    
+                    float scale = 0;
+                    if (!parse_err && float.TryParse(args[1], out scale)) {
+                        CmdTempBot.ScaleAxisBot(p, bot, axis, scale);
+                    } else {
+                        p.Message("%cCould not parse one or more arguments of scale.");
+                    }
+                } else {
+                    p.Message("%cNot enough arguments provided for scale.");
+                }
+            } else {
+                p.Message("%cNo arguments were provided for scale.");
             }
         }
         
@@ -663,6 +713,12 @@ namespace MCGalaxy {
                   return;
                 }
                 
+                if (args[0].CaselessEq("scale")) {
+                  if (args.Length < 2) { p.Message("%cYou need args for botName, axis and scale OR botName, scaleX, scaleY and scaleZ."); return; }
+                  TryScale(p, args[1]);
+                  return;
+                }
+                
                 Help(p);
             }
             
@@ -914,6 +970,62 @@ namespace MCGalaxy {
                     p.Send(Packet.EntityProperty(bot.id, EntityProp.RotZ, rotz));
                 }
             }
+
+            void TryScale(Player p, string message) {
+                string[] args = message.Split(' ');
+                if (args.Length < 3) { p.Message("%cYou need args for botName, axis and scale OR botName, scaleX, scaleY and scaleZ."); return; }
+                
+                PlayerBot bot = GetBotAtName(p, args[0]);
+                if (bot != null) {
+                    if (args.Length >= 4) {
+                        float scalex = 0, scaley = 0, scalez = 0;
+                        if (!CommandParser.GetReal(p, args[1], "X scale", ref scalex)) { return; }
+                        if (!CommandParser.GetReal(p, args[2], "Y scale", ref scaley)) { return; }
+                        if (!CommandParser.GetReal(p, args[3], "Z scale", ref scalez)) { return; }
+                        ScaleBot(p, bot, scalex, scaley, scalez);
+                    } else {
+                        float scale = 0;
+                        if (!CommandParser.GetReal(p, args[2], "Scale", ref scale)) { return; }
+
+                        if (args[1].CaselessEq("x")) {
+                          ScaleAxisBot(p, bot, EntityProp.ScaleX, scale);
+                        } else if (args[1].CaselessEq("y")) {
+                          ScaleAxisBot(p, bot, EntityProp.ScaleY, scale);
+                        } else if (args[1].CaselessEq("z")) {
+                          ScaleAxisBot(p, bot, EntityProp.ScaleZ, scale);
+                        } else {
+                          p.Message("%cAxis must be X, Y or Z.");
+                        }
+                    }
+                }
+            }
+
+            public static void ScaleAxisBot(Player p, PlayerBot bot, EntityProp axis, float scale) {
+                if (axis == EntityProp.ScaleX) bot.ScaleX = scale;
+                if (axis == EntityProp.ScaleY) bot.ScaleY = scale;
+                if (axis == EntityProp.ScaleZ) bot.ScaleZ = scale;
+                
+                if (p.Supports(CpeExt.EntityProperty)) {
+                  int packed = (int) (scale * 1000);
+                  // need to check if change model needs to be sent before these
+                  p.Send(Packet.EntityProperty(bot.id, axis, packed));
+                }
+            }
+            
+            public static void ScaleBot(Player p, PlayerBot bot, float scalex, float scaley, float scalez) {
+                bot.ScaleX = scalex;
+                bot.ScaleY = scaley;
+                bot.ScaleZ = scalez;
+                
+                if (p.Supports(CpeExt.EntityProperty)) {
+                    int packedx = (int) (scalex * 1000);
+                    int packedy = (int) (scaley * 1000);
+                    int packedz = (int) (scalez * 1000);
+                    p.Send(Packet.EntityProperty(bot.id, EntityProp.ScaleX, packedx));
+                    p.Send(Packet.EntityProperty(bot.id, EntityProp.ScaleY, packedy));
+                    p.Send(Packet.EntityProperty(bot.id, EntityProp.ScaleZ, packedz));
+                }
+            }
             
             static PlayerBot GetBotAtName(Player p, string botName) {
                 Tinfo list;
@@ -949,6 +1061,9 @@ namespace MCGalaxy {
                 p.Message("%T/TempBot rot [botName] x/y/z [angle]");
                 p.Message("%T/TempBot rot [botName] [rotX rotY rotZ]");
                 p.Message("%HSets the XYZ rotation of a client-side bot.");
+                p.Message("%T/TempBot scale [botName] x/y/z [scale]");
+                p.Message("%T/TempBot scale [botName] [scaleX scaleY scaleZ]");
+                p.Message("%HSets the model scale of a client-side bot.");
             }
             
             public override void Help(Player p, string message) {
@@ -973,7 +1088,10 @@ namespace MCGalaxy {
                     p.Message("%H Removes this tempbot.");
                     p.Message("%Trot x/y/z [angle]");
                     p.Message("%Trot [rotX rotY rotZ]");
-                    p.Message("%H Sets rotation of tempbot.");
+                    p.Message("%H Sets XYZ rotation of tempbot.");
+                    p.Message("%Tscale x/y/z [angle]");
+                    p.Message("%Tscale [rotX rotY rotZ]");
+                    p.Message("%H Sets model scale of tempbot.");
                     p.Message("%HYou can chain AI together with commas. e.g:");
                     p.Message("%Hstare 10,wait 20,move 32 64 30");
                     p.Message("%HPlease note the (lack of) spaces.");
