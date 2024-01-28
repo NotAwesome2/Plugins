@@ -218,22 +218,22 @@ namespace MCGalaxy {
                         p.Message("%cCould not parse one or more arguments of rot.");
                     }
                 } else if (args.Length >= 2) {
-                    bool prop_error = false;
+                    bool parse_err = false;
                     
-                    EntityProp prop = EntityProp.RotX;
+                    EntityProp axis = EntityProp.RotX;
                     if (args[0].CaselessEq("x")) {
-                        prop = EntityProp.RotX;
+                        axis = EntityProp.RotX;
                     } else if (args[0].CaselessEq("y")) {
-                        prop = EntityProp.RotY;
+                        axis = EntityProp.RotY;
                     } else if (args[0].CaselessEq("z")) {
-                        prop = EntityProp.RotZ;
+                        axis = EntityProp.RotZ;
                     } else {
-                        prop_error = true;
+                        parse_err = true;
                     }
                     
                     int angle = 0;
-                    if (!prop_error && Int32.TryParse(args[1], out angle)) {
-                        CmdTempBot.RotAxisBot(p, bot, prop, angle);
+                    if (!parse_err && Int32.TryParse(args[1], out angle)) {
+                        CmdTempBot.RotAxisBot(p, bot, axis, angle);
                     } else {
                         p.Message("%cCould not parse one or more arguments of rot.");
                     }
@@ -888,29 +888,24 @@ namespace MCGalaxy {
                 }
             }
 
-            public static void RotAxisBot(Player p, PlayerBot bot, EntityProp prop, int value) {
-                byte angle = Orientation.DegreesToPacked(value);
-                
+            public static void RotAxisBot(Player p, PlayerBot bot, EntityProp axis, int angle) {
                 Orientation rot = bot.Rot;
-                if (prop == EntityProp.RotX) rot.RotX = angle;
-                if (prop == EntityProp.RotY) rot.RotY = angle;
-                if (prop == EntityProp.RotZ) rot.RotZ = angle;
+                byte packed = Orientation.DegreesToPacked(angle);
+                if (axis == EntityProp.RotX) rot.RotX = packed;
+                if (axis == EntityProp.RotY) rot.RotY = packed;
+                if (axis == EntityProp.RotZ) rot.RotZ = packed;
                 bot.Rot = rot;
                 
                 if (p.Supports(CpeExt.EntityProperty)) {
-                    p.Send(Packet.EntityProperty(bot.id, prop, value));
+                    p.Send(Packet.EntityProperty(bot.id, axis, angle));
                 }
             }
             
             public static void RotBot(Player p, PlayerBot bot, int rotx, int roty, int rotz) {
-                byte angle_x = Orientation.DegreesToPacked(rotx);
-                byte angle_y = Orientation.DegreesToPacked(roty);
-                byte angle_z = Orientation.DegreesToPacked(rotz);
-                
                 Orientation rot = bot.Rot;
-                rot.RotX = angle_x;
-                rot.RotY = angle_y;
-                rot.RotZ = angle_z;
+                rot.RotX = Orientation.DegreesToPacked(rotx);
+                rot.RotY = Orientation.DegreesToPacked(roty);
+                rot.RotZ = Orientation.DegreesToPacked(rotz);
                 bot.Rot = rot;
                 
                 if (p.Supports(CpeExt.EntityProperty)) {
