@@ -5,8 +5,8 @@ using MCGalaxy.Drawing.Brushes;
 using MCGalaxy.Drawing.Ops;
 using MCGalaxy.Maths;
 using MCGalaxy.Util;
-using BlockID = System.UInt16;
 using MCGalaxy.Commands;
+using BlockID = System.UInt16;
 
 namespace MCGalaxy.Commands.Building {
 	public sealed class WriteFontPlugin : Plugin {
@@ -54,8 +54,8 @@ namespace MCGalaxy.Commands.Building {
 			FontWriteDrawOp op = new FontWriteDrawOp();
 			op.Scale = scale; op.Spacing = spacing;
 			op.Path  = path;  op.Text    = args[1];
-            op.Text = Chat.Format(op.Text, p);
-            op.Text = ProfanityFilter.Parse(op.Text);
+			op.Text = Chat.Format(op.Text, p);
+			op.Text = ProfanityFilter.Parse(op.Text);
 			
 			// TODO: filthy copy paste
 			DrawArgs dArgs = new DrawArgs();
@@ -123,13 +123,34 @@ namespace MCGalaxy.Commands.Building {
 		public override string Name { get { return "FontWrite"; } }
 		public string Text, Path;
 		public byte Scale, Spacing;
+		public byte GlyphWidth, GlyphHeight;
 		
 		IPaletteMatcher selector = new RgbPaletteMatcher();
 		ImagePalette palette     = ImagePalette.Find("Color");
 		
 		public override long BlocksAffected(Level lvl, Vec3S32[] marks) {
-			// TODO: Lazyyyyyyyy
-			return Text.Length * 64;
+			int count = 0;
+			byte[] data = File.ReadAllBytes(Path);
+
+			using (IBitmap2D img = IBitmap2D.Create())
+			{
+				img.Decode(data);
+				GlyphWidth = (byte)(img.Width >> 4);
+				GlyphHeight = (byte)(img.Height >> 4);
+
+				img.LockBits();
+
+				for (int i = 0; i < Text.Length; i++) {
+					char c = Text[i].UnicodeToCp437();
+
+					if (c == '&' && i < Text.Length - 1) {
+						char n = Text[i + 1].UnicodeToCp437();
+						if (!Colors.List[n].Undefined) { i++; continue; }
+					}
+					count += CountBlocks(c, img);
+				}
+			}
+			return count;
 		}
 		
 		Vec3S32 dir, pos;
@@ -148,8 +169,8 @@ namespace MCGalaxy.Commands.Building {
 			using (IBitmap2D img = IBitmap2D.Create())
 			{
 				img.Decode(data);
-				if (img.Width != 128 || img.Height != 128)
-					throw new InvalidOperationException("Font must be 128x128 image");
+				GlyphWidth = (byte)(img.Width >> 4);
+				GlyphHeight = (byte)(img.Height >> 4);
 
 				img.LockBits();
 				ColorDesc tint = Colors.List['f'];
@@ -161,7 +182,7 @@ namespace MCGalaxy.Commands.Building {
 					if (c == '&' && i < Text.Length - 1) {
 						char n = Text[i+1].UnicodeToCp437();
 						if (!Colors.List[n].Undefined) {
-		 					tint = Colors.List[n]; i++; 
+							tint = Colors.List[n]; i++;
 							continue;
 						}
 					}
@@ -170,28 +191,51 @@ namespace MCGalaxy.Commands.Building {
 			}
 		}
 		
-		static int GetTileWidth(IBitmap2D src, int x, int y) {
-			for (int xx = 7; xx >= 0; xx--) {
+		static int GetTileWidth(IBitmap2D src, int x, int y, int width, int height) {
+			for (int xx = width - 1; xx >= 0; xx--) {
 				// Is there a pixel in this column
-				for (int yy = 0; yy < 8; yy++) {
+				for (int yy = 0; yy < height; yy++) {
 					if (src.Get(x + xx, y + yy).A > 20) return xx + 1;
 				}
 			}
 			return 0;
 		}
+
+		int CountBlocks(char c, IBitmap2D src) {
+			int X = (c & 0x0F) * GlyphWidth;
+			int Y = (c >> 4) * GlyphHeight;
+			int width = GetTileWidth(src, X, Y, GlyphWidth, GlyphHeight);
+
+			if (width == 0) {
+				return 0;
+			} else {
+				int modified = 0;
+
+				for (int xx = 0; xx < width; xx++) {
+					for (int yy = 0; yy < GlyphHeight; yy++) {
+						Pixel P = src.Get(X + xx, Y + (GlyphHeight - 1 - yy));
+						if (P.A < 127) continue;
+
+						modified += Scale * Scale;
+					}
+				}
+
+				return modified;
+			}
+		}
 		
 		void DrawLetter(Player p, char c, IBitmap2D src, ColorDesc tint, DrawOpOutput output) {
-			int Y = (int)(c >> 4)   * 8;
-			int X = (int)(c & 0x0F) * 8;
-			int width = GetTileWidth(src, X, Y);
+			int X = (int)(c & 0x0F) * GlyphWidth;
+			int Y = (int)(c >> 4)   * GlyphHeight;
+			int width = GetTileWidth(src, X, Y, GlyphWidth, GlyphHeight);
 			
 			if (width == 0) {
 				if (c != ' ') p.Message("\"{0}\" is not currently supported, replacing with space.", c);
-				pos += dir * (2 * Scale);
+				pos += dir * (GlyphWidth / 4 * Scale);
 			} else {
 				for (int xx = 0; xx < width; xx++) {
-					for (int yy = 0; yy < 8; yy++) {
-						Pixel P = src.Get(X + xx, Y + (7-yy));
+					for (int yy = 0; yy < GlyphHeight; yy++) {
+						Pixel P = src.Get(X + xx, Y + (GlyphHeight-1-yy));
 						if (P.A <= 127) continue;
 						
 						BlockID b;
