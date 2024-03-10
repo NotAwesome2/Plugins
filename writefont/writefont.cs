@@ -203,7 +203,7 @@ namespace MCGalaxy.Commands.Building {
 
 		int CountBlocks(char c, IBitmap2D src) {
 			int X = (c & 0x0F) * GlyphWidth;
-			int Y = (c >> 4) * GlyphHeight;
+			int Y = (c >> 4)   * GlyphHeight;
 			int width = GetTileWidth(src, X, Y, GlyphWidth, GlyphHeight);
 
 			if (width == 0) {
@@ -225,8 +225,8 @@ namespace MCGalaxy.Commands.Building {
 		}
 		
 		void DrawLetter(Player p, char c, IBitmap2D src, ColorDesc tint, DrawOpOutput output) {
-			int X = (int)(c & 0x0F) * GlyphWidth;
-			int Y = (int)(c >> 4)   * GlyphHeight;
+			int X = (c & 0x0F) * GlyphWidth;
+			int Y = (c >> 4)   * GlyphHeight;
 			int width = GetTileWidth(src, X, Y, GlyphWidth, GlyphHeight);
 			
 			if (width == 0) {
