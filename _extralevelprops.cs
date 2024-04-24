@@ -140,7 +140,7 @@ namespace ExtraLevelProps
     internal class LevelProp {
         
         public const string propColor = "&6";
-        const string propsAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._+,-";
+        const string propsAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._+,-/";
         static string verifiedPath = Core.propsDirectory + "_extralevelprops.txt";
         static readonly object verifiedLocker = new object();
         static Dictionary<string, LevelProp> definedProps = new Dictionary<string, LevelProp>();

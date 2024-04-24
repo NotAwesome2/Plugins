@@ -55,7 +55,7 @@ public static bool SetExtraProp(this Level level, string key, string value)
 //Returns false if the property was removed (value is null, empty, or 0), otherwise true.
 //This method will throw a System.ArgumentException if you attempt to set a property that has not been defined yet.
 //This method will throw a System.ArgumentException if you pass a key or value with characters that are not included in
-//the allowed character set: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._+,-
+//the allowed character set: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._+,-/
 
 //Example usage: set the script this level should run by default if no script is provided.
 p.level.SetExtraProp("script", "common_actions");
