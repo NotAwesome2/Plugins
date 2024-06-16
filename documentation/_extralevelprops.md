@@ -1,7 +1,10 @@
 # _extralevelprops.cs
-This plugin adds the command `/mapext` which allows adding extra properties that are displayed in `/map`. These properties do not do anything on their own, but they can be read by other plugins to add functionality. After you load this plugin, edit `plugins/extralevelprops/_extralevelprops.txt` to define extra properties. This must be done in order to set them.
+This plugin adds the command `/mapext` which allows adding extra properties that are displayed in `/map`. These properties do not do anything on their own, but they can be read by other plugins to add functionality.
 
-## Usage in plugins
+After you load this plugin and another plugin that uses it, you may edit `plugins/extralevelprops/_extralevelprops.txt` to change the the rank permission needed to set properties.
+
+## 1. How to use _extralevelprops class members in your plugin
+
 At the top of your plugin source code, add:
 
 `//pluginref _extralevelprops.dll`
@@ -14,7 +17,55 @@ Then use ExtraLevelProps namespace with a `using` statement:
 
 This will enable all of the Level extension methods which you can call on an instance of a Level.
 
-## Methods
+## 2. How to define a property in your plugin
+
+In your plugin's Load method:
+- call `ExtraLevelProps.ExtraLevelProps.Register`
+
+In your plugin's Unload method:
+- call `ExtraLevelProps.ExtraLevelProps.Unregister`
+
+Notice the two "ExtraLevelProps" chained together. Sorry about that.
+
+The Register method may throw an ArgumentException if another plugin is already using the prop you're trying to define.
+
+Make sure to handle that gracefully by adding a try-catch to exit the plugin Load or make sure that it's the first line of code you call to ensure nothing else is left dangling.
+
+
+```CS
+public static void Register(string pluginName, string propName, LevelPermission defaultPermission, string[] propDesc, OnPropChanging onPropChanging, DisplayValue displayValue = null);
+```
+- `pluginName` -
+The name of the plugin you're calling this from. You can just pass `name`. This helps provide feedback to the user if the plugin fails to load.
+- `propName` The name of the property you're adding. This may not contain spaces and is limited to the allowed character set for props. See `SetExtraProp` comments for details.
+- `defaultPermission` - The default lowest rank that is allowed to set this permission using `/mapext`. LevelPermission.Guest is recommended.
+- `propDesc` An array of lines that will be displayed to the player using `/help mapext [prop]`. The first line should describe the input format like `[true/false]` and the following lines should describe what the property does.
+- `onPropChanging` - The method that will be called when a player changes this property. You may pass null if you do not need to do anything special when the property is changed. See below for the delegate that describes the required function signature (arguments)
+- `displayValue` - The optional method that will be called when this property is displayed using `/map`. See below for the delegate that describes the required function signature (arguments)
+
+```CS
+public static void Unregister(string propName);
+```
+- `propName` -
+The name of the prop you're unregistering. This should be the same as the one from Register. Make sure not to forget to unregister this when you unload the plugin, otherwise bad things can happen.
+
+### Delegates
+```CS
+public delegate void OnPropChanging(Player p, Level level, ref string value, ref bool cancel);
+```
+- `p` - The player who is changing this property.
+- `level` - The level this property is being changed in
+- `value` - The value that the property is about to be changed to. Because this is passed by ref, your plugin can modify this value before it is changed.
+- `cancel` - Set this boolean to true if you want to prevent the prop from being changed. Tip: provide feedback for why the prop change was cancelled using `p.Message`
+
+```CS
+public delegate string DisplayValue(Player p, Level level, string value);
+```
+- `p` - The player this value is being displayed to.
+- `level` - The level this property is set in.
+- `value` - The value that is about to be displayed. To change this, your function should return a string based on this passed in value.
+
+## 3. How to get a property in your plugin
 
 "key" is the name of the property you are trying to get the value from. It is not case sensitive.
 
@@ -48,6 +99,8 @@ public static int GetExtraPropInt(this Level level, string key)
 //Defaults to 0 if no "max_lives" property has been set or the property could not be parsed as an int.
 int maxLives = p.level.GetExtraPropInt("max_lives");
 ```
+
+## 4. Misc methods
 
 ```CS
 public static bool SetExtraProp(this Level level, string key, string value)
@@ -83,4 +136,13 @@ foreach (var kvp in kvps) {
     p.Message("  &6{0}&S: {1}", kvp.Key, kvp.Value);
 }
 
+```
+
+```CS
+public static void OnPropChangingBool(Player p, Level level, ref string value, ref bool cancel);
+//This is a convenience method that you can pass to
+//ExtraLevelProps.ExtraLevelProps.Register onPropChanging parameter
+//to ensure that the property is treated like a true/false boolean.
+//Remember that you need to include the double prefix:
+//ExtraLevelProps.ExtraLevelProps.OnPropChangingBool
 ```
