@@ -37,11 +37,11 @@ public static void Register(string pluginName, string propName, LevelPermission 
 ```
 - `pluginName` -
 The name of the plugin you're calling this from. You can just pass `name`. This helps provide feedback to the user if the plugin fails to load.
-- `propName` The name of the property you're adding. This may not contain spaces and is limited to the allowed character set for props. See `SetExtraProp` comments for details.
+- `propName` - The name of the property you're adding. This may not contain spaces and is limited to the allowed character set for props. See `SetExtraProp` comments for details.
 - `defaultPermission` - The default lowest rank that is allowed to set this permission using `/mapext`. LevelPermission.Guest is recommended.
-- `propDesc` An array of lines that will be displayed to the player using `/help mapext [prop]`. The first line should describe the input format like `[true/false]` and the following lines should describe what the property does.
-- `onPropChanging` - The method that will be called when a player changes this property. You may pass null if you do not need to do anything special when the property is changed. See below for the delegate that describes the required function signature (arguments)
-- `displayValue` - The optional method that will be called when this property is displayed using `/map`. See below for the delegate that describes the required function signature (arguments)
+- `propDesc` - An array of lines that will be displayed to the player using `/help mapext [prop]`. The first line should describe the input format like `[true/false]` and the following lines should describe what the property does.
+- `onPropChanging` - The method that will be called when a player changes this property. You may pass null if you do not need to do anything special when the property is changed. See below for the delegate that describes the required function signature (arguments).
+- `displayValue` - The optional method that will be called when this property is displayed using `/map`. See below for the delegate that describes the required function signature (arguments).
 
 ```CS
 public static void Unregister(string propName);
