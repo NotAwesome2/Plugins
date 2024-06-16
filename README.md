@@ -55,3 +55,6 @@ This plugin adds [Not-Awesome-Survival](https://github.com/NotAwesome2/Nas) styl
 This plugin adds the command `/mapext` which allows adding extra properties that are displayed in `/map`. These properties do not do anything on their own, but they can be read by other plugins to add functionality.
 
 [Full documentation](documentation/_extralevelprops.md).
+
+## kickoutdated.cs
+This plugin will prevent players from connecting if they are not using enhanced mode or are outdated. A relevant kick message will be displayed to the player. Players who are VIP will not be kicked (see /help vip). 
