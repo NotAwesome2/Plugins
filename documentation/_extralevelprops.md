@@ -22,15 +22,34 @@ This will enable all of the Level extension methods which you can call on an ins
 In your plugin's Load method:
 - call `ExtraLevelProps.ExtraLevelProps.Register`
 
+Example:
+```CS
+const string NO_BOTS_PROP = "nobots";
+static string[] noBotsDesc = new string[] {
+    "[true/false]",
+    "Disallows the creation of bots.", };
+
+public override void Load(bool startup) {
+    //"name" is the name of the plugin.
+    ExtraLevelProps.ExtraLevelProps.Register(name, NO_BOTS_PROP, LevelPermission.Guest, noBotsDesc, ExtraLevelProps.ExtraLevelProps.OnPropChangingBool);
+}
+```
+
 In your plugin's Unload method:
 - call `ExtraLevelProps.ExtraLevelProps.Unregister`
 
-Notice the two "ExtraLevelProps" chained together. Sorry about that.
+Example:
+```CS
+public override void Unload(bool shutdown) {
+    ExtraLevelProps.ExtraLevelProps.Unregister(NO_BOTS_PROP);
+}
+```
 
 The Register method may throw an ArgumentException if another plugin is already using the prop you're trying to define.
 
 Make sure to handle that gracefully by adding a try-catch to exit the plugin Load or make sure that it's the first line of code you call to ensure nothing else is left dangling.
 
+### Methods
 
 ```CS
 public static void Register(string pluginName, string propName, LevelPermission defaultPermission, string[] propDesc, OnPropChanging onPropChanging, DisplayValue displayValue = null);
