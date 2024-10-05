@@ -6,7 +6,7 @@ namespace MCGalaxy {
 
     public sealed class PluginNoCefDM : Plugin {
         public override string name { get { return "nocefdm"; } }
-        public override string MCGalaxy_Version { get { return "1.9.4.5"; } }
+        public override string MCGalaxy_Version { get { return "1.9.5.0"; } }
         public override string creator { get { return "???"; } }
 
         public override void Load(bool startup) {
@@ -20,7 +20,7 @@ namespace MCGalaxy {
             OnChatEvent.Unregister(HandleChat);
         }
 
-        void HandleChat(ChatScope scope, Player source, string msg, object arg, ref ChatMessageFilter filter, bool irc) {
+        void HandleChat(ChatScope scope, Player source, ref string msg, object arg, ref ChatMessageFilter filter, bool irc) {
             if (!IsCefMessage(msg)) { return; }
             filter = (pl, xyz) => pl == source;
             
