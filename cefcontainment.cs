@@ -17,6 +17,7 @@ namespace MCGalaxy {
     public sealed class PluginCefContainment : Plugin {
         
         static string[] allowedWebsites = new string[] { "https://www.youtube.com", "https://youtube.com", "https://youtu.be", "https://i.imgur.com" };
+        const bool SITE_WHITELIST = false;
         
         public override string name { get { return "CefContainment"; } }
         public override string MCGalaxy_Version { get { return "1.9.4.9"; } }
@@ -83,23 +84,36 @@ namespace MCGalaxy {
         static bool HasCef(Player p) {
             return p.Session.appName != null && p.Session.appName.Contains("+ cef");
         }
-        static void OnPlayerCommand(Player p, string cmd, string args, CommandData data) {
+        static void OnPlayerCommand(Player p, string cmd, string message, CommandData data) {
+            if (cmd.CaselessEq("me")) {
+                message = Colors.Strip(message);
+                int iColon = message.IndexOf(':');
+                if (iColon == -1) { return; }
+                if (!message.CaselessContains("cef")) { return; }
+                p.cancelcommand = true;
+                Command.Find("me").Use(p, message.Replace(":", ";"), data);
+            }
             if (!HasCef(p)) { return; }
             if (cmd.CaselessEq("pclients")) {
                 //why would I do such a thing? to remove its usage from /last
-                Command.Find("pclients").Use(p, args);
+                Command.Find("pclients").Use(p, message);
                 p.cancelcommand = true;
             }
         }
         
         
-        
+        static bool IsMod(Player p) {
+            return p.group.Permission >= LevelPermission.Operator;
+        }
         static string[] urlCommands = new string[] { "create", "play", "queue" };
         static bool AllowedCefCommand(Player p, string message) {
+            //if (IsMod(p)) { return true; }
             
             string[] cefCommandArgs = message.SplitSpaces(2);
             string cefCommand = cefCommandArgs[0];
             if (cefCommand.CaselessEq("click")) { p.Message("&WSorry, cef click is disabled for security reasons."); return false; }
+            
+            if (!SITE_WHITELIST) { return true; }
             
             if (cefCommandArgs.Length < 2) { return true; } //only one arg, okay to send since no url
             string cefArgs = cefCommandArgs[1];
