@@ -1371,7 +1371,7 @@ namespace MCGalaxy {
             int maxFrames = 60 * 10;
             public void StartRecording() {
                 p.Message("&aStarted recording tempbot movement.");
-                p.SendCpeMessage(STOP_LINE, "&7(stop with /tbot record)");
+                p.SendCpeMessage(STOP_LINE, "&7(stop with /tbot record)", LINE_PRIORITY);
                 keyFrames.Clear();
                 recording = true;
             }
