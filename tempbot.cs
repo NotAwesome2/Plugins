@@ -46,15 +46,12 @@ namespace MCGalaxy {
         
         Command tempbotCmd;
         Command flipcoinCmd;
-        Command moveBotsCmd;
         public override void Load(bool startup) {
             
             tempbotCmd = new CmdTempBot();
             flipcoinCmd = new CmdFlipCoin();
-            moveBotsCmd = new CmdMoveBots();
             Command.Register(tempbotCmd);
             Command.Register(flipcoinCmd);
-            Command.Register(moveBotsCmd);
             
             OnPlayerDisconnectEvent.Register(HandleDisconnect, Priority.High);
             OnSentMapEvent.Register(HandleSentMap, Priority.High);
@@ -79,7 +76,6 @@ namespace MCGalaxy {
         public override void Unload(bool shutdown) {
             Command.Unregister(tempbotCmd);
             Command.Unregister(flipcoinCmd);
-            Command.Unregister(moveBotsCmd);
             
             OnPlayerDisconnectEvent.Unregister(HandleDisconnect);
             OnSentMapEvent.Unregister(HandleSentMap);
@@ -110,7 +106,10 @@ namespace MCGalaxy {
             foreach (Player p in PlayerInfo.Online.Items) {
                 if (!tinfoFor.ContainsKey(p.name)) { continue; }
                 
+                
                 Tinfo tinfo = tinfoFor[p.name];
+                if (tinfo.level != p.level) { tinfoFor.Remove(p.name); continue; }
+                
                 tinfo.DoRecord();
                 
                 List<PlayerBot> bots = tinfo.botList;
@@ -698,7 +697,12 @@ namespace MCGalaxy {
                 
                 if (args[0].CaselessEq("summon")) {
                     if (args.Length < 2) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch."); return; }
-                    TryTP(p, args[1]);
+                    TryTP(p, args[1], TPBot);
+                    return;
+                }
+                if (args[0].CaselessEq("tp")) {
+                    if (args.Length < 2) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch."); return; }
+                    TryTP(p, args[1], SnapBot);
                     return;
                 }
                 
@@ -719,7 +723,26 @@ namespace MCGalaxy {
                   return;
                 }
                 
+                if (args[0].CaselessEq("list")) {
+                    DoList(p);
+                    return;
+                }
+
                 Help(p);
+            }
+
+            static void DoList(Player p) {
+                if (!tinfoFor.ContainsKey(p.name)) {
+                    p.Message("No tempbots have been used in this level yet, so there are none to list.");
+                    return;
+                }
+                Tinfo tinfo = tinfoFor[p.name];
+                if (tinfo.botList.Count == 0) {
+                    p.Message("There are no tempbots to list.");
+                    return;
+                }
+                p.Message("Tempbots currently spawned in {0}&S:", p.level.ColoredName);
+                p.Message("{0}", tinfo.botList.Join((bot) => bot.name, "&S, "));
             }
             
             static void ToggleRecord(Player p) {
@@ -868,10 +891,12 @@ namespace MCGalaxy {
                 bot.SkinName = skinName;
                 
                 //       SendSpawnEntity(byte id, string name, string skin, Position pos, Orientation rot);
-                p.Session.SendSpawnEntity(bot.id, bot.DisplayName, bot.SkinName, bot.Pos, bot.Rot);
+                string displayName = bot.DisplayName;
+                if (displayName == "empty") { displayName = ""; }
+                p.Session.SendSpawnEntity(bot.id, displayName, bot.SkinName, bot.Pos, bot.Rot);
             }
             
-            void TryTP(Player p, string message) {
+            void TryTP(Player p, string message, TPAction action) {
                 string[] args = message.Split(' ');
                 if (args.Length < 6) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch."); return; }
                 PlayerBot bot = GetBotAtName(p, args[0]);
@@ -883,24 +908,36 @@ namespace MCGalaxy {
                     if (!CommandParser.GetReal(p, args[3], "z position", ref z)) { return; }
                     if (!CommandParser.GetInt(p,  args[4], "yaw", ref yaw)) { return; }
                     if (!CommandParser.GetInt(p,  args[5], "pitch", ref pitch)) { return; }
-                    TPBot(p, bot, x, y, z, yaw, pitch);
+                    action(p, bot, x, y, z, yaw, pitch);
                 }
             }
+            
+            delegate void TPAction(Player p, PlayerBot bot, float x, float y, float z, int yaw, int pitch);
+            
             public static void TPBot(Player p, PlayerBot bot, float x, float y, float z, int yaw, int pitch) {
+                UpdateInternalPosition(p, bot, x, y, z, yaw, pitch);
+                p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
+            }
+            
+            public static void SnapBot(Player p, PlayerBot bot, float x, float y, float z, int yaw, int pitch) {
+                UpdateInternalPosition(p, bot, x, y, z, yaw, pitch);
+                //SendTeleport(byte id, Position pos, Orientation rot, Packet.TeleportMoveMode moveMode, bool usePos = true, bool interpolateOri = false, bool useOri = true)
+                p.Session.SendTeleport(bot.id, bot.Pos, bot.Rot, Packet.TeleportMoveMode.AbsoluteInstant, true, false, true);
+            }
+            
+            static void UpdateInternalPosition(Player p, PlayerBot bot, float x, float y, float z, int yaw, int pitch) {
                 Position pos = Position.FromFeet((int)(x*32) +16, (int)(y*32), (int)(z*32) +16);
                 bot.Pos = pos;
                 
-                //looks weird if their head snaps then instantly looks at you again...
-                if (!bot.AIName.CaselessStarts("stare")) {
-                    byte byteYaw = Orientation.DegreesToPacked(yaw);
-                    byte bytePitch = Orientation.DegreesToPacked(pitch);
-                    Orientation rot = bot.Rot;
-                    rot.HeadX = bytePitch;
-                    rot.RotY = byteYaw;
-                    bot.Rot = rot;
-                }
+                //Don't update yaw pitch if bot is staring at you
+                if (bot.AIName.CaselessStarts("stare")) { return; }
                 
-                p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
+                byte byteYaw = Orientation.DegreesToPacked(yaw);
+                byte bytePitch = Orientation.DegreesToPacked(pitch);
+                Orientation rot = bot.Rot;
+                rot.HeadX = bytePitch;
+                rot.RotY = byteYaw;
+                bot.Rot = rot;
             }
             
             void TrySetAIName(Player p, string message) {
@@ -1048,6 +1085,8 @@ namespace MCGalaxy {
                 p.Message("%H Places a client-side bot.");
                 p.Message("%T/TempBot summon [botName] [x y z] [yaw pitch]");
                 p.Message("%H Summons a client-side bot.");
+                p.Message("%T/TempBot tp [botName] [x y z] [yaw pitch]");
+                p.Message("%H TPs a client-side bot. (snappier than summon)");
                 p.Message("%T/TempBot remove [botName]");
                 p.Message("%H Removes a client-side bot.");
                 p.Message("%T/TempBot model [botName] [model name]");
@@ -1064,6 +1103,7 @@ namespace MCGalaxy {
                 p.Message("%T/TempBot scale [botName] x/y/z [scale]");
                 p.Message("%T/TempBot scale [botName] [scaleX scaleY scaleZ]");
                 p.Message("%HSets the model scale of a client-side bot.");
+                p.Message("%T/TempBot list &H- list active tempbots.");
             }
             
             public override void Help(Player p, string message) {
@@ -1286,13 +1326,14 @@ namespace MCGalaxy {
             
             public Tinfo(Player p) {
                 this.p = p;
+                this.level = p.level;
                 //This is required for CustomModels plugin to work correctly with tempbots. Do not remove.
                 p.Extras["TempBot_BotList"] = botList;
             }
             public Player p;
             public List<PlayerBot> botList = new List<PlayerBot>();
-            public bool[] usedIDs = new bool[64];
-            
+            public bool[] usedIDs = new bool[126]; //starts at 128, ends at 254
+            public readonly Level level;
             
             static string Battery(float percent) {
                 int maxHealth = 6;
@@ -1361,7 +1402,7 @@ namespace MCGalaxy {
                 //p.Message("-");
             }
             public void StopRecording() {
-                p.Message("&eStopped recording tempbot movement.");
+                p.Message("&eStopped recording tempbot movement after &b{0}&e frames.", keyFrames.Count);
                 p.SendCpeMessage(STOP_LINE, "");
                 p.SendCpeMessage(REC_LINE, "");
                 recording = false;
@@ -1547,77 +1588,6 @@ namespace MCGalaxy {
                     if (pos == botPositions[i]) { return true; }
                 }
                 return false;
-            }
-
-        }
-        
-        public class CmdMoveBots : Command2 {
-            public override string name { get { return "MoveBots"; } }
-            
-            public override string shortcut { get { return ""; } }
-            
-            public override bool MessageBlockRestricted { get { return true; } }
-
-            public override string type { get { return "other"; } }
-            
-            public override bool museumUsable { get { return false; } }
-            
-            public override LevelPermission defaultRank { get { return LevelPermission.Operator; } }
-            
-            static bool OwnsMap(Player p, Level lvl) {
-                if (lvl.name.CaselessStarts(p.name)) return true;
-                string[] owners = lvl.Config.RealmOwner.Replace(" ", "").Split(',');
-                
-                foreach (string owner in owners) {
-                    if (owner.CaselessEq(p.name)) return true;
-                }
-                return false;
-            }
-            
-            public override void Use(Player p, string message, CommandData data)
-            {
-                if (message.Length == 0) { Help(p); return; }
-                bool canUse = false;// = p.group.Permission >= p.level.BuildAccess.Min;
-                
-                if (OwnsMap(p, p.level) || p.group.Permission >= LevelPermission.Operator) canUse = true;
-                if (!canUse) {
-                    p.Message("&cYou can only use this command on your own maps."); return;
-                }
-                
-                string[] bits = message.SplitSpaces(5);
-                if (bits.Length < 3) { Help(p); return; }
-                //x y z 3           
-                int x = -1, y = -1, z = -1;
-                
-                if (!CommandParser.GetInt(p, bits[0], "X delta", ref x)) { return; }
-                if (!CommandParser.GetInt(p, bits[1], "Y delta", ref y)) { return; }
-                if (!CommandParser.GetInt(p, bits[2], "Z delta", ref z)) { return; }
-                x *= 32;
-                y *= 32;
-                z *= 32;
-                
-                Position pos;
-                byte yaw, pitch;
-                PlayerBot[] bots = p.level.Bots.Items;
-                for (int i = 0; i < bots.Length; i++) {
-                    
-                    pos.X = bots[i].Pos.X + x;
-                    pos.Y = bots[i].Pos.Y + y;
-                    pos.Z = bots[i].Pos.Z + z;
-                    yaw = bots[i].Rot.RotY; pitch = bots[i].Rot.HeadX;
-                    bots[i].Pos = pos;
-                    bots[i].SetYawPitch(yaw, pitch);
-                }
-                
-                MCGalaxy.Bots.BotsFile.Save(p.level);
-                
-            }
-            
-            public override void Help(Player p)
-            {
-                p.Message( "%T/MoveBots [x y z]");
-                p.Message( "%HMoves all the bots in the map you're in by [x y z].");
-                p.Message( "%HFor example, 0 1 0 would move all the bots up by 1 block.");
             }
 
         }
