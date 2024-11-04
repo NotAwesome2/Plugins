@@ -1323,7 +1323,8 @@ namespace MCGalaxy {
         public class Tinfo {
             const CpeMessageType STOP_LINE = CpeMessageType.Status1;
             const CpeMessageType REC_LINE = CpeMessageType.Status3;
-            
+            const PersistentMessagePriority LINE_PRIORITY = PersistentMessagePriority.Highest;
+
             public Tinfo(Player p) {
                 this.p = p;
                 this.level = p.level;
@@ -1384,9 +1385,9 @@ namespace MCGalaxy {
                 
                 string battery = "["+Battery(percent)+"&f]:";
                 if (keyFrames.Count % 10 < 5) {
-                    p.SendCpeMessage(REC_LINE, "&c• &fREC   "+battery);
+                    p.SendCpeMessage(REC_LINE, "&c• &fREC   "+battery, LINE_PRIORITY);
                 } else {
-                    p.SendCpeMessage(REC_LINE, "&fREC   "+battery);
+                    p.SendCpeMessage(REC_LINE, "&fREC   "+battery, LINE_PRIORITY);
                 }
                 
                 
@@ -1403,8 +1404,8 @@ namespace MCGalaxy {
             }
             public void StopRecording() {
                 p.Message("&eStopped recording tempbot movement after &b{0}&e frames.", keyFrames.Count);
-                p.SendCpeMessage(STOP_LINE, "");
-                p.SendCpeMessage(REC_LINE, "");
+                p.SendCpeMessage(STOP_LINE, "", LINE_PRIORITY);
+                p.SendCpeMessage(REC_LINE, "", LINE_PRIORITY);
                 recording = false;
                 DisplayCode();
             }
