@@ -31,8 +31,8 @@ This plugin adds /GotoRandomCool, which is like /gotorandom, but based on a cura
 
 ## higherlight.cs
 This plugin improves /Highlight:
-- Entire level is darkened except highlighted blocks
-- "xray" option is provided to make everything except highlighted changes invisible.
+- Entire level is darkened except highlighted blocks.
+- An "xray" option is provided to make everything except highlighted changes invisible.
 - You can configure which blocks are used via `plugins/higherlight/highlightblocks.properties`.
 
 ## make.cs
