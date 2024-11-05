@@ -29,6 +29,12 @@ Disables cef from sending automatic DMs. This prevents users from automatically 
 ## grc.cs
 This plugin adds /GotoRandomCool, which is like /gotorandom, but based on a curated list. The list can be managed with the /grc command.
 
+# higherlight.cs
+This plugin improves /Highlight:
+- Entire level is darkened except highlighted blocks
+- "xray" option is provided to make everything except highlighted changes invisible.
+- You can configure which blocks are used via `plugins/higherlight/highlightblocks.properties`.
+
 ## make.cs
 This plugins adds /make and /makeGB, which allows you to quickly create shapes such as slabs, walls, and stairs, for the level you're in or the entire server.
 
