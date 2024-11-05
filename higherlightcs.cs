@@ -14,8 +14,8 @@ using MCGalaxy.Network;
 using MCGalaxy.Maths;
 using BlockID = System.UInt16;
 using System.IO;
-using System.Text;
 using System.Linq;
+using MCGalaxy.Config;
 
 namespace NA2 {
 
@@ -48,89 +48,34 @@ namespace NA2 {
     }
 
     public class HighlightConfig {
-
+        [ConfigBlock("HighlightPlaced", "Highlight", Block.Lime)]
+        public BlockID highlightPlaced = Block.Lime;
+        [ConfigBlock("HighlightDeleted", "Highlight", Block.TNT)]
+        public BlockID highlightDeleted = Block.TNT;
+        
         const string Folder = "plugins/higherlight/";
         const string HighlightBlocksFile = Folder + "highlightblocks.properties";
-        const string PlacedProp = "HighlightPlaced";
-        const string DeletedProp = "HighlightDeleted";
 
-
-        /// <summary>
-        /// Lime and TNT. Cannot change.
-        /// </summary>
-        static BlockID[] defaultBlocks = new BlockID[] { Block.Lime, Block.TNT };
-        public static BlockID GetDefault(int i) {
-            return defaultBlocks[i];
-        }
-        /// <summary>
-        /// Initialized with LoadHighlightBlocks
-        /// </summary>
-        BlockID[] preferredBlocks = null;
-
-        public BlockID this[int i] {
-            get { return preferredBlocks[i]; }
-        }
-        public int Length { get { return preferredBlocks.Length; } }
-
+        static ConfigElement[] cfg;
         public void Load() {
-            GenerateFile();
-
-            string[] lines = File.ReadAllLines(HighlightBlocksFile);
-
-            preferredBlocks = (BlockID[])defaultBlocks.Clone();
-
-            foreach (string l in lines) {
-                if (l.StartsWith('#')) continue;
-
-                string line = RemoveWhitespace(l);
-                string[] words = line.Split(new char[] { '=' }, 2, StringSplitOptions.RemoveEmptyEntries);
-                if (words.Length != 2) continue;
-
-                string prop = words[0];
-                string value = words[1];
-
-                if (prop.CaselessEq(PlacedProp)) { ParseProp(prop, value, 0); continue; }
-                if (prop.CaselessEq(DeletedProp)) { ParseProp(prop, value, 1); continue; }
-
-                Logger.Log(LogType.Warning, "higherlight.cs: There is no config property \"{0}\".", prop);
-            }
+            if (!File.Exists(HighlightBlocksFile)) 
+                GenerateFile();
+            
+            if (cfg == null) cfg = ConfigElement.GetAll(typeof(HighlightConfig));
+            ConfigElement.ParseFile(cfg, HighlightBlocksFile, this);
         }
-        static void GenerateFile() {
+        
+        void GenerateFile() {
             Directory.CreateDirectory(Folder);
-            if (!File.Exists(HighlightBlocksFile)) {
-                File.WriteAllLines(HighlightBlocksFile,
-                    new string[] {
-                        "# This file controls which block IDs should be used for /highlight blocks.",
-                        "# Lines starting with # are ignored",
-                        "# If these are set to blank or 0, the server will ignore them and automatically generate highlight blocks to use.",
-                        PlacedProp + " = ",
-                        DeletedProp + " = ",
-                    }
-                );
+            if (cfg == null) cfg = ConfigElement.GetAll(typeof(HighlightConfig));
+            using (StreamWriter w = new StreamWriter(HighlightBlocksFile)) {
+                w.WriteLine("# This file controls which block IDs should be used for /highlight blocks.");
+                w.WriteLine("# Lines starting with # are ignored");
+                w.WriteLine("# If these are set to blank or 0, the server will ignore them and automatically generate highlight blocks to use.");
+                w.WriteLine();
+                
+                ConfigElement.Serialise(cfg, w, this);
             }
-        }
-        void ParseProp(string prop, string value, int index) {
-            BlockID parsed;
-            if (!BlockID.TryParse(value,
-                System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture, out parsed)) {
-                Logger.Log(LogType.Warning, "higherlight.cs: Could not parse {0} = {1} as a block ID.", prop, value);
-                return;
-            }
-            if (parsed == Block.Obsidian) { Logger.Log(LogType.Warning, "higherlight.cs: Obsidian is not a valid highlight block."); return; }
-
-            if (parsed > 0 && parsed <= Block.MaxRaw) {
-                preferredBlocks[index] = Block.FromRaw(parsed);
-            }
-        }
-
-        static string RemoveWhitespace(string input) {
-            StringBuilder sb = new StringBuilder(input.Length);
-            foreach (char c in input) {
-                if (Char.IsWhiteSpace(c)) continue;
-                sb.Append(c);
-            }
-            return sb.ToString();
         }
     }
 
@@ -146,9 +91,9 @@ namespace NA2 {
         /// <summary>
         /// Read-only collection of currently set place and delete highlight blocks
         /// </summary>
-        public static BlockID[] actualHighlightBlocks {
+        public static BlockID[] HighlightBlocks {
             get {
-                return new BlockID[] { HighlightDrawOp.DefaultPlaceHighlight, HighlightDrawOp.DefaultDeleteHighlight };
+                return new[] { HighlightDrawOp.DefaultPlaceHighlight, HighlightDrawOp.DefaultDeleteHighlight };
             }
         }
 
@@ -184,11 +129,12 @@ namespace NA2 {
         /// <summary>
         /// Runs before the level switches, removing the blockdefs.
         /// </summary>
-        public static void OnJoiningLevel(Player p, Level lvl, ref bool canJoin) {
+        static void OnJoiningLevel(Player p, Level lvl, ref bool canJoin) {
             if (!canJoin) return; //Not really foolproof if another plugin runs after this, but good enough...
             CleanupHighlight(p);
         }
-        public static void OnPlayerCommand(Player p, string cmd, string args, CommandData data) {
+        
+        static void OnPlayerCommand(Player p, string cmd, string args, CommandData data) {
             if (cmd.CaselessEq("reload")) CleanupHighlight(p);
         }
 
@@ -201,51 +147,53 @@ namespace NA2 {
             List<BlockID> freeIDs = GetFreeIDs(p, 2);
             if (freeIDs == null) {
                 //Worst case scenario. Blockdef IDs aren't free so we need to use the actual preferredBlock ID as the highlight blocks.
-                HighlightDrawOp.DefaultPlaceHighlight = config[0];
-                HighlightDrawOp.DefaultDeleteHighlight = config[1];
+                HighlightDrawOp.DefaultPlaceHighlight = config.highlightPlaced;
+                HighlightDrawOp.DefaultDeleteHighlight = config.highlightDeleted;
                 return false;
             }
 
             BlockDefinition[] defs = p.level.CustomBlockDefs;
 
-            for (int i = 0; i < config.Length; i++) {
-                BlockID prefBlock = config[i];
-
-                BlockDefinition def;
-                if (defs[prefBlock] == null) {
-                    if (prefBlock <= Block.CPE_MAX_BLOCK) {
-                        //The user might choose a block from the default cc set that the server hasn't made a blockdef for yet
-                        def = DefaultSet.MakeCustomBlock(prefBlock);
-                    } else {
-                        //The user chose a block that isn't in the default set and hasn't been defined at all. Fallback to default.
-                        def = DefaultSet.MakeCustomBlock(HighlightConfig.GetDefault(i));
-                    }
-                } else {
-                    //The user chose a block that the server has a blockdef for. Use its blockdef.
-                    def = defs[prefBlock].Copy();
-                }
-
-                string oldName = def.Name;
-                def.Name = i == 0 ? "Placed highlight" : "Deleted highlight";
-                if (oldName.EndsWith('#')) {
-                    def.Name += '#';
-                }
-                if (oldName.StartsWith('#')) {
-                    def.Name = '#' + def.Name;
-                }
-
-                def.Brightness = 8;
-                def.UseLampBrightness = true;
-                def.SetBlock(freeIDs[i]);
-
-                p.Session.SendDefineBlock(def);
-            }
+            SetupHighlightBlock(p, freeIDs, defs, config.highlightPlaced, 0);
+            SetupHighlightBlock(p, freeIDs, defs, config.highlightDeleted, 1);
             p.Extras[TempBlockdefsKey] = freeIDs;
 
             HighlightDrawOp.DefaultPlaceHighlight = freeIDs[0];
             HighlightDrawOp.DefaultDeleteHighlight = freeIDs[1];
             return true;
         }
+
+        static void SetupHighlightBlock(Player p, List<BlockID> freeIDs, BlockDefinition[] defs, BlockID prefBlock, int i) {
+            BlockDefinition def;
+            if (defs[prefBlock] == null) {
+                if (prefBlock <= Block.CPE_MAX_BLOCK) {
+                    //The user might choose a block from the default cc set that the server hasn't made a blockdef for yet
+                    def = DefaultSet.MakeCustomBlock(prefBlock);
+                } else {
+                    //The user chose a block that isn't in the default set and hasn't been defined at all. Fallback to default.
+                    def = DefaultSet.MakeCustomBlock(i == 0 ? Block.Lime : Block.TNT);
+                }
+            } else {
+                //The user chose a block that the server has a blockdef for. Use its blockdef.
+                def = defs[prefBlock].Copy();
+            }
+
+            string oldName = def.Name;
+            def.Name = i == 0 ? "Placed highlight" : "Deleted highlight";
+            if (oldName.EndsWith('#')) {
+                def.Name += '#';
+            }
+            if (oldName.StartsWith('#')) {
+                def.Name = '#' + def.Name;
+            }
+
+            def.Brightness = 8;
+            def.UseLampBrightness = true;
+            def.SetBlock(freeIDs[i]);
+
+            p.Session.SendDefineBlock(def);
+        }
+        
         /// <summary>
         /// Returns a list of MCGalaxy blockIDs or null if amount not found
         /// </summary>
@@ -294,14 +242,14 @@ namespace NA2 {
         public override bool museumUsable { get { return false; } }
         public override LevelPermission defaultRank { get { return LevelPermission.Admin; } }
 
-        const string xrayFlag = " xray";
+        const string XRAY_FLAG = " xray";
         public override void Use(Player p, string message, CommandData data) {
             if (message.Length == 0) { Help(p); return; }
 
             bool xray = false;
-            if (message.CaselessEnds(xrayFlag)) {
+            if (message.CaselessEnds(XRAY_FLAG)) {
                 xray = true;
-                message = message.Substring(0, message.Length - xrayFlag.Length);
+                message = message.Substring(0, message.Length - XRAY_FLAG.Length);
             }
 
             if (!ValidateHighlightInput(p, message)) return;
@@ -315,8 +263,6 @@ namespace NA2 {
             if (xray) AddZone(p);
 
             PluginHigherlight.highlight.Use(p, message, data);
-            CommandData data2 = data;
-            data2.Context = CommandContext.MessageBlock;
             EnvUtils.Darken(p);
             p.Message("Use %b/reload %Sto fix blocks and environment colors.");
         }
@@ -337,12 +283,12 @@ namespace NA2 {
         static void DarkenBlocks(Player p, bool xray) {
             BlockDefinition[] defs = p.level.CustomBlockDefs;
 
-            List<ushort> highlights = PluginHigherlight.actualHighlightBlocks.ToList();
+            List<ushort> highlights = PluginHigherlight.HighlightBlocks.ToList();
 
             for (int i = 0; i < defs.Length; i++) {
                 if (defs[i] == null) continue;
 
-                if (!xray && defs[i].FullBright == false) continue;
+                if (!xray && !defs[i].FullBright) continue;
                 if (highlights.Contains(defs[i].GetBlock())) continue;
 
                 BlockDefinition copy = defs[i].Copy();
@@ -386,23 +332,22 @@ namespace NA2 {
             int yLen = (y2 - y1) + 1;
             int zLen = (z2 - z1) + 1;
 
-            BlockID[] highlightBlocks = PluginHigherlight.actualHighlightBlocks;
+            BlockID[] highlightBlocks = PluginHigherlight.HighlightBlocks;
 
             BufferedBlockSender buffer = new BufferedBlockSender(p);
-            int index = 0;
             for (int yi = y3 + yLen - 1; yi >= y3; --yi) {
                 for (int zi = z3; zi < z3 + zLen; ++zi) {
                     for (int xi = x3; xi < x3 + xLen; ++xi) {
 
                         bool place = false;
                         foreach (BlockID b in highlightBlocks) {
-                            if (p.level.GetBlock((ushort)xi, (ushort)yi, (ushort)zi) == b) { place = true; break; }
+                            if (p.level.GetBlock((ushort)xi, (ushort)yi, (ushort)zi) != b) continue;
+                            place = true; break;
                         }
                         if (!place) { continue; }
                         
                         int pos = p.level.PosToInt((ushort)xi, (ushort)yi, (ushort)zi);
                         if (pos >= 0) buffer.Add(pos, Block.Obsidian);
-                        index++;
                     }
                 }
             }
@@ -414,7 +359,7 @@ namespace NA2 {
             p.Message("&HHighlights blocks changed by [player] in the past <timespan>");
             p.Message("&H If <timespan> is not given, highlights for last 30 minutes");
             p.Message("&W/Highlight cannot be disabled, use /reload to un-highlight");
-            p.Message("&HAdd \"{0}\" to make all blocks except highlight invisible.", xrayFlag);
+            p.Message("&HAdd \"{0}\" to make all blocks except highlight invisible.", XRAY_FLAG);
         }
     }
 }
