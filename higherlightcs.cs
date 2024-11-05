@@ -280,7 +280,7 @@ namespace NA2 {
                 BlockDefinition def = new BlockDefinition();
                 def.RawID = Block.ToRaw(id);
                 p.Session.SendUndefineBlock(def);
-                p.Message("Removing highlight blockdef {0}", def.RawID);
+                //p.Message("Removing highlight blockdef {0}", def.RawID);
             }
         }
 
