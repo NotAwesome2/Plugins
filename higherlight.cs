@@ -296,12 +296,22 @@ namespace NA2 {
             List<BlockID> highlights = PluginHigherlight.HighlightBlocks;
 
             for (int i = 0; i < defs.Length; i++) {
-                if (defs[i] == null) continue;
+                BlockDefinition def = defs[i];
 
-                if (!xray && !defs[i].FullBright) continue;
-                if (highlights.Contains(defs[i].GetBlock())) continue;
+                if (defs[i] == null) {
+                    if (i <= Block.CPE_MAX_BLOCK) {
+                        //The server might not have defined the default blocks
+                        def = DefaultSet.MakeCustomBlock((ushort)i);
+                    } else {
+                        //No default or custom block found, skip
+                        continue;
+                    }
+                }
 
-                BlockDefinition copy = defs[i].Copy();
+                if (!xray && !def.FullBright) continue;
+                if (highlights.Contains(def.GetBlock())) continue;
+
+                BlockDefinition copy = def.Copy();
 
                 copy.FullBright = false;
                 copy.UseLampBrightness = false;
