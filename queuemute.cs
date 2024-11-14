@@ -92,17 +92,8 @@ namespace NA2 {
         public override LevelPermission defaultRank { get { return LevelPermission.Operator; } }
 
         public static void OpMessage(string message, params object[] args) {
-            
             message = "To Ops: " + string.Format(message, args);
-
-            //You can send these to your op channel if you change DiscordOpChannel ID and remove/edit the server name check.
-            if (Server.Config.Name.StartsWith("Not Awesome 2")) {
-                const string DiscordOpChannel = "935380096750088194";
-                ChannelSendMessage discordMessage = new ChannelSendMessage(DiscordOpChannel, "**" + Colors.Strip(message) + "**");
-                DiscordPlugin.Bot.Send(discordMessage);
-            }
-
-            Chat.MessageOps(message);
+            Chat.Message(ChatScope.Perms, message, Chat.OpchatPerms, null, true);
         }
 
         public override void Use(Player p, string message, CommandData data) {
