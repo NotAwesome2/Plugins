@@ -43,6 +43,11 @@ Use `/help make` or `/help makegb` for more information.
 ## orderblocks.cs
 This plugin makes ordering the block menu much easier. See `/help orderblocks` for usage. The top left of the inventory matches with 0, 0, 0 in the blockorder world. All blocks should have 1 block of air between them.
 
+## queuemute.cs
+This plugin adds the command `/queuemute` which allows you to queue a mute that will be applied when the player next joins the server.
+
+In addition, using /mute on an offline player will automatically use /queuemute instead. See `/help queuemute` for more info.
+
 ## tempbot.cs
 This plugin is complimentary to [Not-Awesome-Script](https://github.com/NotAwesome2/Not-Awesome-Script). It allows you to create clientside instances of bots to manipulate with scripted movements. See /help tempbot for more details.
 
