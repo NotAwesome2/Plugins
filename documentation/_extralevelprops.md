@@ -122,13 +122,13 @@ int maxLives = p.level.GetExtraPropInt("max_lives");
 ## 4. Misc methods
 
 ```CS
-//Enumeration of values that TrySetExtraProp returns
+//Enumeration of values that TrySetExtraProp returns.
+//Note that "Cancelled" is only used internally and is not returned from public methods.
 public enum SetExtraPropResult { Cancelled, Removed, Set }
 
 public static SetExtraPropResult TrySetExtraProp(this Level level, string key, string value)
 //Set level properties through plugin code if you do not want to use or allow the use of /mapext
 //Returns:
-//  SetExtraPropResult.Cancelled if the prop was not set due to custom OnPropChanging delegate
 //  SetExtraPropResult.Set if the prop was succesfully set.
 //  SetExtraPropResult.Removed if the prop was succesfully set to null, empty, or zero
 //Exceptions:
