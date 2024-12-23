@@ -122,15 +122,22 @@ int maxLives = p.level.GetExtraPropInt("max_lives");
 ## 4. Misc methods
 
 ```CS
-public static bool SetExtraProp(this Level level, string key, string value)
+//Enumeration of values that TrySetExtraProp returns
+public enum SetExtraPropResult { Cancelled, Removed, Set }
+
+public static SetExtraPropResult TrySetExtraProp(this Level level, string key, string value)
 //Set level properties through plugin code if you do not want to use or allow the use of /mapext
-//Returns false if the property was removed (value is null, empty, or 0), otherwise true.
-//This method will throw a System.ArgumentException if you attempt to set a property that has not been defined yet.
-//This method will throw a System.ArgumentException if you pass a key or value with characters that are not included in
-//the allowed character set: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._+,-/
+//Returns:
+//  SetExtraPropResult.Cancelled if the prop was not set due to custom OnPropChanging delegate
+//  SetExtraPropResult.Set if the prop was succesfully set.
+//  SetExtraPropResult.Removed if the prop was succesfully set to null, empty, or zero
+//Exceptions:
+//  System.ArgumentException if you attempt to set a property that has not been defined yet.
+//  System.ArgumentException if you pass a key or value with characters that are not included in
+//  the allowed character set: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890._+,-/
 
 //Example usage: set the script this level should run by default if no script is provided.
-p.level.SetExtraProp("script", "common_actions");
+var result = p.level.TrySetExtraProp("script", "common_actions");
 ```
 
 ```CS
