@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Collections.Generic;
 using System.IO;
@@ -6,6 +6,7 @@ using MCGalaxy;
 using MCGalaxy.Commands;
 using MCGalaxy.Commands.Chatting;
 using MCGalaxy.Blocks;
+using MCGalaxy.Blocks.Extended;
 using MCGalaxy.Events.ServerEvents;
 using MCGalaxy.Events.LevelEvents;
 using MCGalaxy.Events.PlayerEvents;
@@ -53,6 +54,7 @@ namespace MCGalaxy {
             Command.Register(tempbotCmd);
             Command.Register(flipcoinCmd);
             
+			OnPlayerClickEvent.Register(HandleClick, Priority.High);
             OnPlayerDisconnectEvent.Register(HandleDisconnect, Priority.High);
             OnSentMapEvent.Register(HandleSentMap, Priority.High);
             
@@ -77,12 +79,40 @@ namespace MCGalaxy {
             Command.Unregister(tempbotCmd);
             Command.Unregister(flipcoinCmd);
             
+			OnPlayerClickEvent.Unregister(HandleClick);
             OnPlayerDisconnectEvent.Unregister(HandleDisconnect);
             OnSentMapEvent.Unregister(HandleSentMap);
             
             tinfoFor.Clear();
             
             instance.Cancel(tickBots);
+        }
+		
+		static bool ClickOnBot(Player p, byte entity) {
+            foreach (PlayerBot b in tinfoFor[p.name].botList) {
+                if (b.EntityID != entity) continue;
+                if (b.ClickedOnText == null && !p.checkingBotInfo) return false;
+
+                Vec3F32 delta = p.Pos.ToVec3F32() - b.Pos.ToVec3F32();
+                float reachSq = p.ReachDistance * p.ReachDistance;
+                if (delta.LengthSquared > (reachSq + 1)) return false;
+
+                if (p.checkingBotInfo) {
+                    b.DisplayInfo(p);
+                    p.checkingBotInfo = false;
+                    return true;
+                }
+                string message = b.ClickedOnText;
+                MessageBlock.Execute(p, message, b.Pos.FeetBlockCoords);
+                return true;
+            }
+            return false;
+        }
+		
+		static void HandleClick(Player p, MouseButton button, MouseAction action, ushort yaw, ushort pitch, byte entity, ushort x, ushort y, ushort z, TargetBlockFace face) {
+            if (action != MouseAction.Released) return;
+            if (!tinfoFor.ContainsKey(p.name)) return;
+            if (entity != null) ClickOnBot(p, entity);
         }
         
         static void HandleDisconnect(Player p, string reason) {
@@ -694,6 +724,12 @@ namespace MCGalaxy {
                     TrySetAIName(p, args[1]);
                     return;
                 }
+				
+				if (args[0].CaselessEq("text")) {
+                    if (args.Length < 2) { p.Message("%cYou need args for botName and text."); return; }
+                    TrySetText(p, args[1]);
+                    return;
+                }
                 
                 if (args[0].CaselessEq("summon")) {
                     if (args.Length < 2) { p.Message("%cYou need args for botName, X, Y, Z, yaw, and pitch."); return; }
@@ -895,6 +931,23 @@ namespace MCGalaxy {
                 if (displayName == "empty") { displayName = ""; }
                 p.Session.SendSpawnEntity(bot.id, displayName, bot.SkinName, bot.Pos, bot.Rot);
             }
+			
+			void TrySetText(Player p, string message)
+            {
+                string[] args = message.SplitSpaces(2);
+                if (args.Length < 2) { p.Message("%cYou need args for text."); return; }
+
+                PlayerBot bot = GetBotAtName(p, args[0]);
+                if (bot != null)
+                {
+                    SetText(p, bot, args[1]);
+                }
+            }
+
+            public static void SetText(Player p, PlayerBot bot, string text)
+            {
+                bot.ClickedOnText = text;
+            }
             
             void TryTP(Player p, string message, TPAction action) {
                 string[] args = message.Split(' ');
@@ -1093,6 +1146,8 @@ namespace MCGalaxy {
                 p.Message("%H Sets model of a client-side bot.");
                 p.Message("%T/TempBot skin [botName] [skin name]");
                 p.Message("%H Sets skin of a client-side bot.");
+				p.Message("%T/TempBot text [botName] [text]");
+                p.Message("%H Sets text of a client-side bot.");
                 p.Message("%T/TempBot ai [botName] [ai arguments]");
                 p.Message("%H Sets ai. Use %T/help tempbot ai %Hfor more info.");
                 p.Message("%T/TempBot where");
