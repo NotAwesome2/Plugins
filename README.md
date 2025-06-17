@@ -62,7 +62,7 @@ It is displayed in /whois and when the player logs in.
 This plugin adds [Not-Awesome-Survival](https://github.com/NotAwesome2/Nas) style gen as a /newlvl gen option.
 
 ## _extralevelprops.cs
-This plugin adds the command `/mapext` which allows adding extra properties that are displayed in `/map`. These properties do not do anything on their own, but they can be read by other plugins to add functionality.
+This plugin adds the command `/mapext` which allows adding extra properties that are displayed in `/map`. These properties do not do anything on their own, but they can be read by other plugins to add functionality. **Scroll to the top of this page to find the _extralelevelprops.cs file to download.**
 
 [Full documentation](documentation/_extralevelprops.md).
 
