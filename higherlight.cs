@@ -191,10 +191,10 @@ namespace NA2 {
 
             string oldName = def.Name;
             def.Name = i == 0 ? "Placed highlight" : "Deleted highlight";
-            if (oldName.EndsWith('#')) {
+            if (oldName.EndsWith("#")) {
                 def.Name += '#';
             }
-            if (oldName.StartsWith('#')) {
+            if (oldName.StartsWith("#")) {
                 def.Name = '#' + def.Name;
             }
 
