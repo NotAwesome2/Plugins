@@ -48,6 +48,10 @@ This plugin adds the command `/queuemute` which allows you to queue a mute that 
 
 In addition, using /mute on an offline player will automatically use /queuemute instead. See `/help queuemute` for more info.
 
+## rv.cs
+Adds /replacevars, which is like /replace but automatically replaces all of the matching slabs, walls, etc.
+Adds /paintvars, which is like /paint but automatically matches the shape of the block you're breaking.
+
 ## tempbot.cs
 This plugin is complimentary to [Not-Awesome-Script](https://github.com/NotAwesome2/Not-Awesome-Script). It allows you to create clientside instances of bots to manipulate with scripted movements. See /help tempbot for more details.
 
