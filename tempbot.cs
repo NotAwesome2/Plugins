@@ -149,6 +149,7 @@ namespace MCGalaxy {
 
                 Tinfo tinfo = tinfoFor[p.name];
                 if (tinfo.level != p.level) {
+                    DespawnAll(p);
                     tinfoFor.Remove(p.name, out Tinfo _);
                     continue;
                 }
