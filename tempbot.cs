@@ -123,6 +123,7 @@ namespace MCGalaxy {
                 Entities.Despawn(p, bot);
                 t.modelList.Remove(bot);
             }
+            t.botList.Clear();
         }
         static void HandleDisconnect(Player p, string reason) {
             tinfoFor.Remove(p.name, out Tinfo _);
