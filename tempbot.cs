@@ -421,8 +421,8 @@ namespace MCGalaxy {
             }
 
             //p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
-            p.EntityList.SendTeleport(bot, bot.Pos, bot.Rot);
-
+            //p.EntityList.SendTeleport(bot, bot.Pos, bot.Rot);
+            SendTeleport(p, bot, bot.Pos, bot.Rot);
 
             if (pointer == data.Length) {
                 //end of stream, move on to next botai
@@ -434,6 +434,18 @@ namespace MCGalaxy {
             Array.Copy(data, pointer, newData, 0, newData.Length);
 
             bot.AIName = instructionName + " " + Convert.ToBase64String(newData) + "," + trailingInstructions;
+        }
+        static void SendTeleport(Player p, PlayerBot bot, Position pos, Orientation rot) {
+            p.EntityList.PerformAction(bot, (id) => {
+                p.Session.SendTeleport(id, pos, rot);
+            });
+        }
+        static void SendTeleport(Player p, PlayerBot bot, Position pos, Orientation rot, Packet.TeleportMoveMode mode) {
+            p.EntityList.PerformAction(bot, (id) => {
+                if (!p.Session.SendTeleport(id, pos, rot, mode)) {
+                    p.Session.SendTeleport(id, pos, rot);
+                }
+            });
         }
 
         static void DoDiceFall(Player p, PlayerBot bot) {
@@ -495,7 +507,7 @@ namespace MCGalaxy {
 
             //bot.AIName = trailingInstructions;
             //p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
-            p.EntityList.SendTeleport(bot, bot.Pos, bot.Rot);
+            SendTeleport(p, bot, bot.Pos, bot.Rot);
         }
 
         static int GetPosBelowFeet(Player p, PlayerBot bot) {
@@ -635,7 +647,7 @@ namespace MCGalaxy {
             // --
 
             //p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
-            p.EntityList.SendTeleport(bot, bot.Pos, bot.Rot);
+            SendTeleport(p, bot, bot.Pos, bot.Rot);
         }
 
         public static void MoveTowardPos(Player p, PlayerBot bot, Position there, float speed, out DestInfo destInfo) {
@@ -651,7 +663,7 @@ namespace MCGalaxy {
             bot.Pos = newPos;
 
             //p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
-            p.EntityList.SendTeleport(bot, bot.Pos, bot.Rot);
+            SendTeleport(p, bot, bot.Pos, bot.Rot);
         }
 
         static Orientation GetRotLookingAt(Position here, Position there) {
@@ -917,7 +929,7 @@ namespace MCGalaxy {
                 bot.Model = modelName;
                 if (p.Supports(CpeExt.ChangeModel)) {
                     OnSendingModelEvent.Call(bot, ref modelName, p);
-                    p.EntityList.SendModel(bot, modelName);
+                    p.EntityList.UpdateModel(bot, modelName);
                 }
             }
 
@@ -938,7 +950,8 @@ namespace MCGalaxy {
                 string displayName = bot.DisplayName;
                 if (displayName == "empty") { displayName = ""; }
                 //p.Session.SendSpawnEntity(bot.id, displayName, bot.SkinName, bot.Pos, bot.Rot);
-                p.EntityList.Add(bot, bot.Pos, bot.Rot, bot.SkinName, displayName, bot.Model, true);
+                //p.EntityList.Add(bot, bot.Pos, bot.Rot, bot.SkinName, displayName, bot.Model, true);
+                p.EntityList.Add(bot, bot.Pos, bot.Rot, false);
             }
 
             void TrySetText(Player p, string message) {
@@ -976,13 +989,13 @@ namespace MCGalaxy {
             public static void TPBot(Player p, PlayerBot bot, float x, float y, float z, int yaw, int pitch) {
                 UpdateInternalPosition(p, bot, x, y, z, yaw, pitch);
                 //p.Send(Packet.Teleport(bot.id, bot.Pos, bot.Rot, p.Supports(CpeExt.ExtEntityPositions)));
-                p.EntityList.SendTeleport(bot, bot.Pos, bot.Rot);
+                SendTeleport(p, bot, bot.Pos, bot.Rot);
             }
 
             public static void SnapBot(Player p, PlayerBot bot, float x, float y, float z, int yaw, int pitch) {
                 UpdateInternalPosition(p, bot, x, y, z, yaw, pitch);
                 //p.Session.SendTeleport(bot.id, bot.Pos, bot.Rot, Packet.TeleportMoveMode.AbsoluteInstant, true, false, true);
-                p.EntityList.SendTeleport(bot, bot.Pos, bot.Rot, Packet.TeleportMoveMode.AbsoluteInstant);
+                SendTeleport(p, bot, bot.Pos, bot.Rot, Packet.TeleportMoveMode.AbsoluteInstant);
             }
 
             static void UpdateInternalPosition(Player p, PlayerBot bot, float x, float y, float z, int yaw, int pitch) {
